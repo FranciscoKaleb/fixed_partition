@@ -1,0 +1,313 @@
+ * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            padding: 0px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .flex-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex: 1;
+        }
+
+        .left, .right {
+            flex: 1;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .table-container {
+            max-height: 800px;
+            overflow-y: auto;
+            overflow-x: auto;
+        }
+
+        .controls {
+            margin-bottom: 15px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #clearBtn {
+            background-color: #f44336;
+        }
+
+        #clearBtn:hover {
+            background-color: #da190b;
+        }
+
+        #generateSampleBtn {
+            background-color: #2196F3;
+        }
+
+        #generateSampleBtn:hover {
+            background-color: #0b7dda;
+        }
+
+        #clearTableBtn {
+            background-color: #ff9800;
+        }
+
+        #clearTableBtn:hover {
+            background-color: #e68900;
+        }
+
+        #cancelBtn {
+            background-color: #f44336;
+        }
+
+        #cancelBtn:hover {
+            background-color: #da190b;
+        }
+
+        #resetBtn {
+            background-color: #607d8b;
+        }
+
+        #resetBtn:hover {
+            background-color: #455a64;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background-color: white;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: center;
+        }
+
+        th {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .dynamic-column {
+            background-color: #e3f2fd;
+        }
+
+
+
+        footer {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            margin-top: auto;
+        }
+
+        .highlight {
+            border: 1px solid #ddd;
+        }
+
+        p {
+            margin: 5px 0;
+            font-weight: bold;
+        }
+
+        #processControls p {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .process-layout {
+            margin-bottom: 20px;
+        }
+
+        .process-inputs {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .process-tables-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .process-table {
+            flex: 1;
+        }
+
+        .process-table table {
+            margin-top: 0;
+            font-size: 12px;
+        }
+
+        .process-table th,
+        .process-table td {
+            padding: 8px;
+        }
+
+        .right {
+            font-size: 12px;
+        }
+
+        .right button,
+        .right input,
+        .right select {
+            font-size: 12px;
+            padding: 8px;
+        }
+
+        .right p {
+            font-size: 12px;
+        }
+
+        .process-options {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .memory-options {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .finalize-section {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .action-buttons {
+            width: 100%;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button:disabled,
+        input:disabled,
+        select:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #finalizeBtn {
+            background-color: #9c27b0;
+            font-size: 16px;
+            padding: 12px 30px;
+        }
+
+        #finalizeBtn:hover {
+            background-color: #7b1fa2;
+        }
+
+        .modal {
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.hidden {
+            display: none;
+        }
+
+        .modal:not(.hidden) {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            text-align: center;
+            position: relative;
+            min-width: 300px;
+        }
+
+        .close {
+            position: absolute;
+            right: 15px;
+            top: 10px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #f44336;
+        }
+
+
+
+
+
+
+
+        .highlight{
+            border-style:solid;
+            border-color:red;
+            border-width:2px;
+        }
+
+        .hidden {
+            display: none;
+        }

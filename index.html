@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table Columns</title>
+    <link rel="stylesheet" type="text/css" href="style.css">
+    <script src="script.js" defer></script>
+</head>
+<body class = "highlight">
+    <header>
+        <h1>Memory Management Simulator</h1>
+    </header>
+
+    <div class="flex-container highlight">
+
+
+        
+        <div class="right highlight">
+            <div class="process-inputs">
+                <p>STEP 1: add process or generate</p>
+                <div class="controls" id="processControls">
+                    <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
+                    <button id="generateSampleBtn" onclick="generateSampleProcesses()">Generate Sample</button>
+                    <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
+                    <input type="text" id="process_name" placeholder="Enter process name">
+                    <input type="text" id="arrival_time" placeholder="Enter arrival time">
+                    <input type="text" id="burst_time" placeholder="Enter burst time">
+                    <input type="text" id="mr" placeholder="Enter mr">
+                    <input type="text" id="priority" placeholder="Enter priority" class="hidden">
+                </div>
+            </div>
+
+            <div class="process-tables-container highlight">
+                <div class="process-table">
+                    <table id="dataTable2" class="highlight">
+                        <thead>
+                            <tr id="headerRow2">
+                                <th>Process</th>
+                                <th>Arrival Time</th>
+                                <th>Burst Time</th>
+                                <th>MR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody2">
+                            <tr>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="process-table hidden" id="liveTableContainer">
+                    <table id="dataTable3" class="highlight">
+                        <thead>
+                            <tr id="headerRow3">
+                                <th>Process</th>
+                                <th>Arrival Time</th>
+                                <th>Burst Time</th>
+                                <th>MR</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody3">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="process-options highlight">
+                <p>STEP 2: choose Algorithm and an allocation strategy</p>
+                <div class="controls">
+                    <p>CPU Algo</p>
+                    <select id="algorithm_options" onchange="alterColumn()">
+                        <option value="FCFS">FCFS</option>
+                        <option value="SJF">SJF</option>
+                        <option value="NPP">NPP</option>
+                    </select>
+                    <p>Allocation Strat</p>
+                    <select id="allocation_strat_options">
+                        <option value="first_fit">First Fit</option>
+                        <option value="next_fit">Next Fit</option>
+                        <option value="best_fit">Best Fit</option>
+                        <option value="worst_fit">Worst Fit</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="memory-options highlight">
+                <p>STEP 3: Add memory blocks</p>
+                <div class="controls">
+                    <button id="addBtn" onclick="addColumn()">Add Memory block</button>
+                    <button id="clearBtn" onclick="clearAllColumns()">Clear All Columns</button>
+                    <input type="text" id="columnInput" placeholder="Enter column name">
+                </div>
+            </div>
+
+            <div class="finalize-section highlight">
+                <button id="finalizeBtn" onclick="finalizeData()">Finalize Data</button>
+            </div>
+
+            <div class="action-buttons highlight">
+                <button id="proceedBtn" disabled onclick = "startStep()">>>></button>
+                <button id="finishBtn" disabled>proceed to finish</button>
+                <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
+                <button id="resetBtn" onclick="resetSimulation()" class="hidden">Reset</button>
+            </div>
+        </div>
+
+        <div class="left highlight">
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr id="headerRow">
+                            <th>Time</th>
+                            <th>IF</th>
+                            <th>EF</th>
+                            <th>MU</th>
+                            <th>Waiting Jobs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="dataRow">
+
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <p id="modalMessage"></p>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2024 Memory Management Simulator | Operating Systems Project
+    </footer>
+
+</body>
+</html>
