@@ -26,9 +26,11 @@
                         <input type="text" id="burst_time" placeholder="Enter burst time">
                         <input type="text" id="mr" placeholder="Enter mr">
                         <input type="text" id="priority" placeholder="Enter priority" class="hidden">
-                        <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
-                        <button id="generateSampleBtn" onclick="generateSampleProcesses()">Generate Sample</button>
-                        <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
+                        <div class="button-row">
+                            <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
+                            <button id="generateSampleBtn" onclick="generateSampleProcesses()">Generate Sample</button>
+                            <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
+                        </div>
                     </div>
                 </div>
 
@@ -52,6 +54,8 @@
                 </div>
             </div>
 
+            <div class="algorithm-label hidden" id="algorithmLabel"></div>
+
             <div class="process-tables-container highlight">
                 <div class="process-table">
                     <table id="dataTable2" class="highlight">
@@ -72,6 +76,11 @@
                             </tr>
                         </tbody>
                     </table>
+                    <div class="edit-controls">
+                        <button id="editBtn" onclick="enableEdit()">Edit</button>
+                        <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
+                        <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
+                    </div>
                 </div>
                 <div class="process-table hidden" id="liveTableContainer">
                     <table id="dataTable3" class="highlight">
@@ -102,13 +111,14 @@
 
             <div class="action-buttons highlight">
                 <button id="proceedBtn" disabled onclick = "startStep()">>>></button>
-                <button id="finishBtn" disabled>proceed to finish</button>
+                <button id="finishBtn" disabled onclick="proceedToFinish()">proceed to finish</button>
                 <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
                 <button id="resetBtn" onclick="resetSimulation()" class="hidden">Reset</button>
             </div>
         </div>
 
         <div class="left highlight">
+            <div class="allocation-label hidden" id="allocationLabel"></div>
             <div class="table-container">
                 <table id="dataTable">
                     <thead>

@@ -34,13 +34,6 @@
                 // Insert before "IF" column (index 1)
                 headerRow.insertBefore(newHeader, headerRow.children[1 + dynamicColumnCount]);
                 
-                // Create new data cell
-                const newCell = document.createElement('td');
-                newCell.textContent = '-';
-                
-                // Insert before "IF" column (index 1)
-                dataRow.insertBefore(newCell, dataRow.children[1 + dynamicColumnCount]);
-                
                 dynamicColumnCount++;
                 columnInput.value = '';
                 
@@ -139,6 +132,48 @@
         }
 
         function generateSampleProcesses() {
+            const algo = document.getElementById('algorithm_options').value;
+            
+            if (algo === 'FCFS') {
+                const fixedData = [
+                    {name: 'A', arrival: 0, burst: 5, mr: 7},
+                    {name: 'B', arrival: 1, burst: 10, mr: 3},
+                    {name: 'C', arrival: 2, burst: 3, mr: 6},
+                    {name: 'D', arrival: 3, burst: 3, mr: 6}
+                ];
+                fixedData.forEach(data => {
+                    const obj = new Process(data.name, data.arrival, data.burst, data.mr, null);
+                    p_arr.push(obj);
+                    addProcessToTable(obj);
+                });
+            } else if (algo === 'SJF') {
+                const fixedData = [
+                    {name: 'A', arrival: 0, burst: 6, mr: 9},
+                    {name: 'B', arrival: 1, burst: 8, mr: 5},
+                    {name: 'C', arrival: 2, burst: 4, mr: 8},
+                    {name: 'D', arrival: 3, burst: 5, mr: 7}
+                ];
+                fixedData.forEach(data => {
+                    const obj = new Process(data.name, data.arrival, data.burst, data.mr, null);
+                    p_arr.push(obj);
+                    addProcessToTable(obj);
+                });
+            } else {
+                // Random generation for NPP
+                for (let i = 1; i <= 5; i++) {
+                    const obj = new Process(
+                        'P' + i,
+                        Math.floor(Math.random() * 19),
+                        Math.floor(Math.random() * 9) + 2,
+                        Math.floor(Math.random() * 91) + 30,
+                        Math.floor(Math.random() * 3) + 1
+                    );
+                    p_arr.push(obj);
+                    addProcessToTable(obj);
+                }
+            }
+            
+            /* Random generation (commented for future use)
             for (let i = 1; i <= 5; i++) {
                 const obj = new Process(
                     'P' + i,
@@ -150,12 +185,95 @@
                 p_arr.push(obj);
                 addProcessToTable(obj);
             }
+            */
         }
 
         function clearProcessTable() {
             const tableBody = document.getElementById("tableBody2");
             tableBody.innerHTML = '<tr><td>-</td><td>-</td><td>-</td><td>-</td></tr>';
             p_arr.length = 0;
+        }
+
+        let originalTableData = [];
+
+        function enableEdit() {
+            const tableBody = document.getElementById('tableBody2');
+            const rows = tableBody.querySelectorAll('tr');
+            originalTableData = [];
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0 && cells[0].textContent !== '-') {
+                    const rowData = [];
+                    cells.forEach(cell => {
+                        rowData.push(cell.textContent);
+                        const input = document.createElement('input');
+                        input.type = 'text';
+                        input.value = cell.textContent;
+                        input.className = 'editable-input';
+                        cell.textContent = '';
+                        cell.appendChild(input);
+                    });
+                    originalTableData.push(rowData);
+                }
+            });
+            
+            document.getElementById('editBtn').classList.add('hidden');
+            document.getElementById('saveBtn').classList.remove('hidden');
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+        }
+
+        function saveEdit() {
+            const tableBody = document.getElementById('tableBody2');
+            const rows = tableBody.querySelectorAll('tr');
+            p_arr.length = 0;
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const inputs = row.querySelectorAll('input');
+                    if (inputs.length > 0) {
+                        const values = [];
+                        inputs.forEach((input, idx) => {
+                            const value = input.value;
+                            values.push(value);
+                            cells[idx].textContent = value;
+                        });
+                        
+                        if (values[0] !== '-') {
+                            const obj = new Process(values[0], values[1], values[2], values[3], values[4] || null);
+                            p_arr.push(obj);
+                        }
+                    }
+                }
+            });
+            
+            document.getElementById('editBtn').classList.remove('hidden');
+            document.getElementById('saveBtn').classList.add('hidden');
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+        }
+
+        function cancelEdit() {
+            const tableBody = document.getElementById('tableBody2');
+            const rows = tableBody.querySelectorAll('tr');
+            let dataIdx = 0;
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length > 0) {
+                    const inputs = row.querySelectorAll('input');
+                    if (inputs.length > 0 && dataIdx < originalTableData.length) {
+                        cells.forEach((cell, idx) => {
+                            cell.textContent = originalTableData[dataIdx][idx];
+                        });
+                        dataIdx++;
+                    }
+                }
+            });
+            
+            document.getElementById('editBtn').classList.remove('hidden');
+            document.getElementById('saveBtn').classList.add('hidden');
+            document.getElementById('cancelEditBtn').classList.add('hidden');
         }
 
         function finalizeData() {
@@ -188,6 +306,9 @@
                 // Clone dataTable2 to dataTable3
                 cloneProcessTable();
                 
+                // Show labels
+                showAlgorithmLabels();
+                
                 // Hide input sections
                 hideInputSections();
             } else {
@@ -206,6 +327,17 @@
             document.querySelector('.steps-container').classList.remove('hidden');
             document.querySelector('.memory-options').classList.remove('hidden');
             document.querySelector('.finalize-section').classList.remove('hidden');
+        }
+
+        function showAlgorithmLabels() {
+            const algo = document.getElementById('algorithm_options').value;
+            const allocStrat = document.getElementById('allocation_strat_options').value;
+            const algoNames = {FCFS: 'First Come First Serve', SJF: 'Shortest Job First', NPP: 'Non-Preemptive Priority'};
+            const allocNames = {first_fit: 'First Fit', next_fit: 'Next Fit', best_fit: 'Best Fit', worst_fit: 'Worst Fit'};
+            document.getElementById('algorithmLabel').textContent = algoNames[algo];
+            document.getElementById('allocationLabel').textContent = allocNames[allocStrat];
+            document.getElementById('algorithmLabel').classList.remove('hidden');
+            document.getElementById('allocationLabel').classList.remove('hidden');
         }
 
         function cloneProcessTable() {
@@ -286,6 +418,36 @@
             }
         }
 
+        function proceedToFinish() {
+            if (currentSimTime === 0) {
+                processQueue = [...p_arr].sort((a, b) => a.arrival_time - b.arrival_time);
+                processQueue.forEach(p => {
+                    allocatedProcesses[p.process_name] = {
+                        remainingBurst: parseInt(p.burst_time),
+                        allocated: false,
+                        memoryBlock: -1
+                    };
+                });
+            }
+            
+            while (!checkAllProcessesDone()) {
+                switch(selectedAlgorithm) {
+                    case 'FCFS_first_fit': FCFSFF(); break;
+                    case 'FCFS_next_fit': FCFSNF(); break;
+                    case 'FCFS_best_fit': FCFSBF(); break;
+                    case 'FCFS_worst_fit': FCFSWF(); break;
+                    case 'SJF_first_fit': SJFFF(); break;
+                    case 'SJF_next_fit': SJFNF(); break;
+                    case 'SJF_best_fit': SJFBF(); break;
+                    case 'SJF_worst_fit': SJFWF(); break;
+                    case 'NPP_first_fit': NPPFF(); break;
+                    case 'NPP_next_fit': NPPNF(); break;
+                    case 'NPP_best_fit': NPPBF(); break;
+                    case 'NPP_worst_fit': NPPWF(); break;
+                }
+            }
+        }
+
         function closeModal() {
             document.getElementById('modal').classList.add('hidden');
         }
@@ -300,6 +462,14 @@
                 
                 if (pState) {
                     row.cells[1].textContent = pState.remainingBurst;
+                    
+                    if (runningProcess === processName) {
+                        row.style.border = '3px solid #4CAF50';
+                        row.style.boxShadow = '0 0 10px rgba(76, 175, 80, 0.5)';
+                    } else {
+                        row.style.border = '';
+                        row.style.boxShadow = '';
+                    }
                 }
             });
         }
@@ -866,13 +1036,21 @@
                         pState.allocated = true;
                         pState.memoryBlock = i;
                         blockStatus[i] = true;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
                         break;
                     }
                 }
             }
+            
+            runningProcess = null;
+            let shortestBurst = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                    shortestBurst = pState.remainingBurst;
+                    runningProcess = p.process_name;
+                }
+            }
+            
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
                 if (pState.allocated && pState.remainingBurst > 0) {
@@ -910,6 +1088,7 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
@@ -917,11 +1096,12 @@
                 }
                 if (pState.remainingBurst === 0) {
                     runningProcess = null;
+                    let shortestBurst = Infinity;
                     for (let p of processQueue) {
                         const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
+                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
                             runningProcess = p.process_name;
-                            break;
                         }
                     }
                 }
@@ -965,11 +1145,18 @@
                         pState.memoryBlock = i;
                         blockStatus[i] = true;
                         nextFitIndex = (i + 1) % dynamicColumnCount;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
                         break;
                     }
+                }
+            }
+            
+            runningProcess = null;
+            let shortestBurst = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                    shortestBurst = pState.remainingBurst;
+                    runningProcess = p.process_name;
                 }
             }
             for (let p of processQueue) {
@@ -1009,6 +1196,18 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of processQueue) {
+                    const pState = allocatedProcesses[p.process_name];
+                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                        shortestBurst = pState.remainingBurst;
+                        runningProcess = p.process_name;
+                    }
+                }
+            }
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
@@ -1016,11 +1215,12 @@
                 }
                 if (pState.remainingBurst === 0) {
                     runningProcess = null;
+                    let shortestBurst = Infinity;
                     for (let p of processQueue) {
                         const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
+                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
                             runningProcess = p.process_name;
-                            break;
                         }
                     }
                 }
@@ -1072,9 +1272,16 @@
                     pState.allocated = true;
                     pState.memoryBlock = bestFitIndex;
                     blockStatus[bestFitIndex] = true;
-                    if (!runningProcess) {
-                        runningProcess = p.process_name;
-                    }
+                }
+            }
+            
+            runningProcess = null;
+            let shortestBurst = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                    shortestBurst = pState.remainingBurst;
+                    runningProcess = p.process_name;
                 }
             }
             for (let p of processQueue) {
@@ -1114,6 +1321,18 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of processQueue) {
+                    const pState = allocatedProcesses[p.process_name];
+                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                        shortestBurst = pState.remainingBurst;
+                        runningProcess = p.process_name;
+                    }
+                }
+            }
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
@@ -1121,11 +1340,12 @@
                 }
                 if (pState.remainingBurst === 0) {
                     runningProcess = null;
+                    let shortestBurst = Infinity;
                     for (let p of processQueue) {
                         const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
+                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
                             runningProcess = p.process_name;
-                            break;
                         }
                     }
                 }
@@ -1177,9 +1397,16 @@
                     pState.allocated = true;
                     pState.memoryBlock = worstFitIndex;
                     blockStatus[worstFitIndex] = true;
-                    if (!runningProcess) {
-                        runningProcess = p.process_name;
-                    }
+                }
+            }
+            
+            runningProcess = null;
+            let shortestBurst = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                    shortestBurst = pState.remainingBurst;
+                    runningProcess = p.process_name;
                 }
             }
             for (let p of processQueue) {
@@ -1219,6 +1446,18 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of processQueue) {
+                    const pState = allocatedProcesses[p.process_name];
+                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
+                        shortestBurst = pState.remainingBurst;
+                        runningProcess = p.process_name;
+                    }
+                }
+            }
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
