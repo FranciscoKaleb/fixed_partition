@@ -7,118 +7,153 @@
     <link rel="stylesheet" type="text/css" href="style.css">
     <script src="script.js" defer></script>
 </head>
-<body class = "highlight">
+<body>
     <header>
-        <h1>Memory Management Simulator</h1>
+        <h1>Single Processor Fixed Partition Simulator</h1>
     </header>
 
-    <div class="flex-container highlight">
+    <div class="flex-container">
 
 
         
-        <div class="right highlight">
+        <div class="right">
+            <div class="steps-container">
+                <div class="process-options">
+                    <p>STEP 1: choose Algorithm and an allocation strategy</p>
+                    <div class="controls">
+                        <div>
+                            <p>CPU Algo</p>
+                            <select id="algorithm_options" onchange="alterColumn()">
+                                <option value="FCFS">FCFS</option>
+                                <option value="SJF">SJF</option>
+                                <option value="NPP">NPP</option>
+                            </select>
+                        </div>
+                        <div>
+                            <p>Allocation Strat</p>
+                            <select id="allocation_strat_options">
+                                <option value="first_fit">First Fit</option>
+                                <option value="next_fit">Next Fit</option>
+                                <option value="best_fit">Best Fit</option>
+                                <option value="worst_fit">Worst Fit</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="steps-container">
                 <div class="process-inputs">
-                    <p>STEP 1: add process or generate</p>
+                    <p>STEP 2: add process or generate</p>
                     <div class="controls" id="processControls">
-                        <input type="text" id="process_name" placeholder="Enter process name">
-                        <input type="text" id="arrival_time" placeholder="Enter arrival time">
-                        <input type="text" id="burst_time" placeholder="Enter burst time">
-                        <input type="text" id="mr" placeholder="Enter mr">
-                        <input type="text" id="priority" placeholder="Enter priority" class="hidden">
+                        <div>
+                            <input type="text" id="process_name" placeholder="Enter process name">
+                            <input type="number" id="arrival_time" placeholder="Enter arrival time">
+                            <input type="number" id="burst_time" placeholder="Enter burst time">
+                            <input type="number" id="mr" placeholder="Enter mr">
+                            <input type="number" id="priority" placeholder="Enter priority" class="hidden">
+                        </div>
                         <div class="button-row">
                             <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
-                            <button id="generateSampleBtn" onclick="generateSampleProcesses()">Generate Sample</button>
+                            <button id="generateSample1Btn" onclick="generateSample1()">Generate Sample 1</button>
+                            <button id="generateSample2Btn" onclick="generateSample2()">Generate Sample 2</button>
+                            <button id="generateSampleBtn" onclick="showGenerateModal()">Generate Custom</button>
                             <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
                         </div>
                     </div>
                 </div>
-
-                <div class="process-options highlight">
-                    <p>STEP 2: choose Algorithm and an allocation strategy</p>
-                    <div class="controls">
-                        <p>CPU Algo</p>
-                        <select id="algorithm_options" onchange="alterColumn()">
-                            <option value="FCFS">FCFS</option>
-                            <option value="SJF">SJF</option>
-                            <option value="NPP">NPP</option>
-                        </select>
-                        <p>Allocation Strat</p>
-                        <select id="allocation_strat_options">
-                            <option value="first_fit">First Fit</option>
-                            <option value="next_fit">Next Fit</option>
-                            <option value="best_fit">Best Fit</option>
-                            <option value="worst_fit">Worst Fit</option>
-                        </select>
-                    </div>
-                </div>
             </div>
 
-            <div class="algorithm-label hidden" id="algorithmLabel"></div>
+            <div class="labels-container hidden" id="labelsContainer">
+                <div class="algorithm-label" id="algorithmLabel"></div>
+                <div class="allocation-label" id="allocationLabel"></div>
+            </div>
 
-            <div class="process-tables-container highlight">
+            <div class="process-tables-container">
                 <div class="process-table">
-                    <table id="dataTable2" class="highlight">
-                        <thead>
-                            <tr id="headerRow2">
-                                <th>Process</th>
-                                <th>Arrival Time</th>
-                                <th>Burst Time</th>
-                                <th>MR</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody2">
-                            <tr>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                    <div class="edit-controls">
-                        <button id="editBtn" onclick="enableEdit()">Edit</button>
-                        <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
-                        <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
+                    <div class="table-wrapper">
+                        <div>
+                            <table id="dataTable2">
+                                <thead>
+                                    <tr id="headerRow2">
+                                        <th>Process</th>
+                                        <th>Arrival Time</th>
+                                        <th>Burst Time</th>
+                                        <th>MR</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody2">
+                                    <tr>
+                                        <td>-</td>
+                                        <td>-</td>
+                                        <td>-</td>
+                                        <td>-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="edit-controls" id="editControls">
+                            <button id="editBtn" onclick="enableEdit()" class="hidden">Edit</button>
+                            <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
+                            <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
+                        </div>
                     </div>
                 </div>
                 <div class="process-table hidden" id="liveTableContainer">
-                    <table id="dataTable3" class="highlight">
-                        <thead>
-                            <tr id="headerRow3">
-                                <th>Process</th>
-                                <th>Remaining Burst</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody3">
-                        </tbody>
-                    </table>
+                    <div class="table-wrapper">
+                        <div>
+                            <table id="dataTable3">
+                                <thead>
+                                    <tr id="headerRow3">
+                                        <th>Process</th>
+                                        <th>Remaining Burst</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody3">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="memory-options highlight">
+            <div class="memory-options">
                 <p>STEP 3: Add memory partition</p>
                 <div class="controls">
-                    <input type="text" id="columnInput" placeholder="Enter partition size">
+                    <input type="number" id="columnInput" placeholder="Enter partition size">
+                </div>
+                <div class="button-row">
                     <button id="addBtn" onclick="addColumn()">Add Partition</button>
                     <button id="clearBtn" onclick="clearAllColumns()">Clear All Partitions</button>
                 </div>
             </div>
 
-            <div class="finalize-section highlight">
+            <div class="finalize-section">
                 <button id="finalizeBtn" onclick="finalizeData()">Finalize Data</button>
             </div>
 
-            <div class="action-buttons highlight">
-                <button id="proceedBtn" disabled onclick = "startStep()">>>></button>
-                <button id="finishBtn" disabled onclick="proceedToFinish()">proceed to finish</button>
+            <div class="action-buttons">
+                <button id="proceedBtn" disabled onclick = "startStep()" class="hidden">>>></button>
+                <button id="finishBtn" disabled onclick="proceedToFinish()" class="hidden">proceed to finish</button>
                 <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
-                <button id="resetBtn" onclick="resetSimulation()" class="hidden">Reset</button>
+            </div>
+
+            <div class="time-display hidden" id="timeDisplay">
+                <label id="currentTimeLabel">Current Time: 0</label>
+            </div>
+
+            <div class="process-summary hidden" id="processSummary">
+                <p><strong>Finished Process:</strong> <span id="finishedProcesses"></span></p>
+                <p><strong>Unfinished Process / Can't Fit Partition:</strong> <span id="unfinishedProcesses"></span></p>
+            </div>
+
+            <div class="reset-section" style="text-align: center; margin-top: 20px;">
+                <button id="editVariablesBtn" onclick="editVariables()" class="hidden">Edit Variables</button>
+                <button id="resetBtn" onclick="showResetModal()" class="hidden">Run Another Simulation</button>
             </div>
         </div>
 
-        <div class="left highlight">
-            <div class="allocation-label hidden" id="allocationLabel"></div>
+        <div class="left">
             <div class="table-container">
                 <table id="dataTable">
                     <thead>
@@ -147,8 +182,64 @@
         </div>
     </div>
 
+    <div id="resetModal" class="modal hidden">
+        <div class="modal-content">
+            <p>This will clear all your data. Are you sure you want to proceed?</p>
+            <p style="font-size: 12px; margin-top: 10px;">Tip: Click "Edit Variables" to keep your data.</p>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button onclick="confirmReset()">Yes, Clear Data</button>
+                <button onclick="closeResetModal()" style="background-color: #607d8b;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="generateModal" class="modal hidden">
+        <div class="modal-content" style="min-width: 400px;">
+            <span class="close" onclick="closeGenerateModal()">&times;</span>
+            <h3 style="margin-bottom: 20px;">Generate Sample Data</h3>
+            <div style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
+                <div>
+                    <label>Number of Processes:</label>
+                    <input type="number" id="genCount" value="5" min="1" max="20" style="width: 100%; margin-top: 5px;">
+                </div>
+                <div>
+                    <label>Arrival Time Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genArrivalMin" value="0" min="0" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genArrivalMax" value="10" min="0" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div>
+                    <label>Burst Time Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genBurstMin" value="2" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genBurstMax" value="10" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div>
+                    <label>Memory Requirement Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genMrMin" value="30" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genMrMax" value="120" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div id="genPriorityDiv" class="hidden">
+                    <label>Priority Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genPriorityMin" value="1" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genPriorityMax" value="3" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button onclick="confirmGenerate()">Generate</button>
+                <button onclick="closeGenerateModal()" style="background-color: #607d8b;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <footer>
-        &copy; 2024 Memory Management Simulator | Operating Systems Project
+        &copy; 2025 Fixed partition Simulator | MIT 501 Project 
     </footer>
 
 </body>

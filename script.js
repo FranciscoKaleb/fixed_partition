@@ -104,6 +104,9 @@
                 const cell5 = row.insertCell(4);
                 cell5.textContent = process.priority || '-';
             }
+            
+            // Show edit button when data is added
+            document.getElementById('editBtn').classList.remove('hidden');
         }
 
         function createProcess(){
@@ -129,6 +132,34 @@
             if (isPriorityColumnVisible) {
                 priorityInput.value = '';
             }
+        }
+
+        function generateSample1() {
+            const fixedData = [
+                {name: 'A', arrival: 0, burst: 5, mr: 7},
+                {name: 'B', arrival: 1, burst: 10, mr: 3},
+                {name: 'C', arrival: 2, burst: 3, mr: 6},
+                {name: 'D', arrival: 3, burst: 3, mr: 6}
+            ];
+            fixedData.forEach(data => {
+                const obj = new Process(data.name, data.arrival, data.burst, data.mr, null);
+                p_arr.push(obj);
+                addProcessToTable(obj);
+            });
+        }
+
+        function generateSample2() {
+            const fixedData = [
+                {name: 'A', arrival: 0, burst: 6, mr: 9},
+                {name: 'B', arrival: 1, burst: 8, mr: 5},
+                {name: 'C', arrival: 2, burst: 4, mr: 8},
+                {name: 'D', arrival: 3, burst: 5, mr: 7}
+            ];
+            fixedData.forEach(data => {
+                const obj = new Process(data.name, data.arrival, data.burst, data.mr, null);
+                p_arr.push(obj);
+                addProcessToTable(obj);
+            });
         }
 
         function generateSampleProcesses() {
@@ -188,33 +219,91 @@
             */
         }
 
+        function showGenerateModal() {
+            const genPriorityDiv = document.getElementById('genPriorityDiv');
+            if (isPriorityColumnVisible) {
+                genPriorityDiv.classList.remove('hidden');
+            } else {
+                genPriorityDiv.classList.add('hidden');
+            }
+            document.getElementById('generateModal').classList.remove('hidden');
+        }
+
+        function closeGenerateModal() {
+            document.getElementById('generateModal').classList.add('hidden');
+        }
+
+        function confirmGenerate() {
+            const count = parseInt(document.getElementById('genCount').value);
+            const arrivalMin = parseInt(document.getElementById('genArrivalMin').value);
+            const arrivalMax = parseInt(document.getElementById('genArrivalMax').value);
+            const burstMin = parseInt(document.getElementById('genBurstMin').value);
+            const burstMax = parseInt(document.getElementById('genBurstMax').value);
+            const mrMin = parseInt(document.getElementById('genMrMin').value);
+            const mrMax = parseInt(document.getElementById('genMrMax').value);
+            const priorityMin = parseInt(document.getElementById('genPriorityMin').value);
+            const priorityMax = parseInt(document.getElementById('genPriorityMax').value);
+            
+            for (let i = 1; i <= count; i++) {
+                const obj = new Process(
+                    'P' + i,
+                    Math.floor(Math.random() * (arrivalMax - arrivalMin + 1)) + arrivalMin,
+                    Math.floor(Math.random() * (burstMax - burstMin + 1)) + burstMin,
+                    Math.floor(Math.random() * (mrMax - mrMin + 1)) + mrMin,
+                    isPriorityColumnVisible ? Math.floor(Math.random() * (priorityMax - priorityMin + 1)) + priorityMin : null
+                );
+                p_arr.push(obj);
+                addProcessToTable(obj);
+            }
+            
+            closeGenerateModal();
+        }
+
         function clearProcessTable() {
             const tableBody = document.getElementById("tableBody2");
             tableBody.innerHTML = '<tr><td>-</td><td>-</td><td>-</td><td>-</td></tr>';
             p_arr.length = 0;
+            document.getElementById('editBtn').classList.add('hidden');
         }
 
         let originalTableData = [];
+        let deletedRows = [];
 
         function enableEdit() {
             const tableBody = document.getElementById('tableBody2');
+            const headerRow = document.getElementById('headerRow2');
             const rows = tableBody.querySelectorAll('tr');
             originalTableData = [];
+            deletedRows = [];
+            
+            // Add delete column header
+            const deleteHeader = document.createElement('th');
+            deleteHeader.textContent = 'Delete';
+            deleteHeader.id = 'deleteHeader';
+            headerRow.appendChild(deleteHeader);
             
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
                 if (cells.length > 0 && cells[0].textContent !== '-') {
                     const rowData = [];
-                    cells.forEach(cell => {
+                    cells.forEach((cell, idx) => {
                         rowData.push(cell.textContent);
                         const input = document.createElement('input');
-                        input.type = 'text';
+                        input.type = idx === 0 ? 'text' : 'number';
                         input.value = cell.textContent;
                         input.className = 'editable-input';
                         cell.textContent = '';
                         cell.appendChild(input);
                     });
                     originalTableData.push(rowData);
+                    
+                    // Add delete button
+                    const deleteCell = row.insertCell(-1);
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.textContent = 'Delete';
+                    deleteBtn.className = 'delete-row-btn';
+                    deleteBtn.onclick = function() { deleteRow(row); };
+                    deleteCell.appendChild(deleteBtn);
                 }
             });
             
@@ -223,30 +312,65 @@
             document.getElementById('cancelEditBtn').classList.remove('hidden');
         }
 
+        function deleteRow(row) {
+            const cells = row.querySelectorAll('td');
+            const rowData = [];
+            cells.forEach((cell, idx) => {
+                if (idx < cells.length - 1) {
+                    const input = cell.querySelector('input');
+                    if (input) {
+                        rowData.push(input.value);
+                    }
+                }
+            });
+            deletedRows.push({ data: rowData, row: row });
+            row.style.display = 'none';
+        }
+
         function saveEdit() {
             const tableBody = document.getElementById('tableBody2');
+            const headerRow = document.getElementById('headerRow2');
             const rows = tableBody.querySelectorAll('tr');
             p_arr.length = 0;
             
+            // Remove deleted rows permanently
+            deletedRows.forEach(item => {
+                item.row.remove();
+            });
+            deletedRows = [];
+            
             rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length > 0) {
-                    const inputs = row.querySelectorAll('input');
-                    if (inputs.length > 0) {
-                        const values = [];
-                        inputs.forEach((input, idx) => {
-                            const value = input.value;
-                            values.push(value);
-                            cells[idx].textContent = value;
-                        });
-                        
-                        if (values[0] !== '-') {
-                            const obj = new Process(values[0], values[1], values[2], values[3], values[4] || null);
-                            p_arr.push(obj);
+                if (row.style.display !== 'none') {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length > 0) {
+                        const inputs = row.querySelectorAll('input');
+                        if (inputs.length > 0) {
+                            const values = [];
+                            inputs.forEach((input, idx) => {
+                                const value = input.value;
+                                values.push(value);
+                                cells[idx].textContent = value;
+                            });
+                            
+                            if (values[0] !== '-') {
+                                const obj = new Process(values[0], values[1], values[2], values[3], values[4] || null);
+                                p_arr.push(obj);
+                            }
+                            
+                            // Remove delete button cell
+                            if (cells.length > (isPriorityColumnVisible ? 5 : 4)) {
+                                cells[cells.length - 1].remove();
+                            }
                         }
                     }
                 }
             });
+            
+            // Remove delete column header
+            const deleteHeader = document.getElementById('deleteHeader');
+            if (deleteHeader) {
+                deleteHeader.remove();
+            }
             
             document.getElementById('editBtn').classList.remove('hidden');
             document.getElementById('saveBtn').classList.add('hidden');
@@ -255,8 +379,15 @@
 
         function cancelEdit() {
             const tableBody = document.getElementById('tableBody2');
+            const headerRow = document.getElementById('headerRow2');
             const rows = tableBody.querySelectorAll('tr');
             let dataIdx = 0;
+            
+            // Restore deleted rows
+            deletedRows.forEach(item => {
+                item.row.style.display = '';
+            });
+            deletedRows = [];
             
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
@@ -264,12 +395,25 @@
                     const inputs = row.querySelectorAll('input');
                     if (inputs.length > 0 && dataIdx < originalTableData.length) {
                         cells.forEach((cell, idx) => {
-                            cell.textContent = originalTableData[dataIdx][idx];
+                            if (idx < originalTableData[dataIdx].length) {
+                                cell.textContent = originalTableData[dataIdx][idx];
+                            }
                         });
                         dataIdx++;
+                        
+                        // Remove delete button cell
+                        if (cells.length > originalTableData[0].length) {
+                            cells[cells.length - 1].remove();
+                        }
                     }
                 }
             });
+            
+            // Remove delete column header
+            const deleteHeader = document.getElementById('deleteHeader');
+            if (deleteHeader) {
+                deleteHeader.remove();
+            }
             
             document.getElementById('editBtn').classList.remove('hidden');
             document.getElementById('saveBtn').classList.add('hidden');
@@ -298,10 +442,18 @@
                 
                 // Enable action buttons
                 document.getElementById('proceedBtn').disabled = false;
+                document.getElementById('proceedBtn').classList.remove('hidden');
                 document.getElementById('finishBtn').disabled = false;
+                document.getElementById('finishBtn').classList.remove('hidden');
+                document.getElementById('editVariablesBtn').classList.remove('hidden');
+                document.getElementById('resetBtn').classList.remove('hidden');
+                document.getElementById('editBtn').classList.add('hidden');
                 
                 // Determine algorithm combination
                 determineAlgorithm();
+                
+                // Check which processes can fit
+                checkProcessFit();
                 
                 // Clone dataTable2 to dataTable3
                 cloneProcessTable();
@@ -318,13 +470,15 @@
         }
 
         function hideInputSections() {
-            document.querySelector('.steps-container').classList.add('hidden');
+            const stepsContainers = document.querySelectorAll('.steps-container');
+            stepsContainers.forEach(container => container.classList.add('hidden'));
             document.querySelector('.memory-options').classList.add('hidden');
             document.querySelector('.finalize-section').classList.add('hidden');
         }
 
         function showInputSections() {
-            document.querySelector('.steps-container').classList.remove('hidden');
+            const stepsContainers = document.querySelectorAll('.steps-container');
+            stepsContainers.forEach(container => container.classList.remove('hidden'));
             document.querySelector('.memory-options').classList.remove('hidden');
             document.querySelector('.finalize-section').classList.remove('hidden');
         }
@@ -336,8 +490,9 @@
             const allocNames = {first_fit: 'First Fit', next_fit: 'Next Fit', best_fit: 'Best Fit', worst_fit: 'Worst Fit'};
             document.getElementById('algorithmLabel').textContent = algoNames[algo];
             document.getElementById('allocationLabel').textContent = allocNames[allocStrat];
-            document.getElementById('algorithmLabel').classList.remove('hidden');
-            document.getElementById('allocationLabel').classList.remove('hidden');
+            document.getElementById('labelsContainer').classList.remove('hidden');
+            document.getElementById('timeDisplay').classList.remove('hidden');
+            document.getElementById('editControls').classList.add('hidden');
         }
 
         function cloneProcessTable() {
@@ -389,6 +544,17 @@
         let selectedAlgorithm = null;
         let nextFitIndex = 0;
         let runningProcess = null;
+        let canFitPartition = [];
+
+        function checkProcessFit() {
+            const maxPartition = Math.max(...hole_arr);
+            canFitPartition = [];
+            for (let p of p_arr) {
+                if (parseInt(p.mr) <= maxPartition) {
+                    canFitPartition.push(p.process_name);
+                }
+            }
+        }
 
         function startStep() {
             if (currentSimTime === 0) {
@@ -451,6 +617,19 @@
         function closeModal() {
             document.getElementById('modal').classList.add('hidden');
         }
+
+        function showResetModal() {
+            document.getElementById('resetModal').classList.remove('hidden');
+        }
+
+        function closeResetModal() {
+            document.getElementById('resetModal').classList.add('hidden');
+        }
+
+        function confirmReset() {
+            document.getElementById('resetModal').classList.add('hidden');
+            resetSimulation();
+        }
         
         function updateLiveTable() {
             const tableBody3 = document.getElementById('tableBody3');
@@ -472,6 +651,8 @@
                     }
                 }
             });
+            
+            document.getElementById('currentTimeLabel').textContent = 'Current Time: ' + currentSimTime;
         }
         
         function getWaitingJobs() {
@@ -497,11 +678,36 @@
         function checkAllProcessesDone() {
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
-                if (!pState.allocated || pState.remainingBurst > 0) {
-                    return false;
+                if (canFitPartition.includes(p.process_name)) {
+                    if (!pState.allocated || pState.remainingBurst > 0) {
+                        return false;
+                    }
                 }
             }
             return true;
+        }
+        
+        function showProcessSummary() {
+            const finished = [];
+            const unfinished = [];
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst === 0) {
+                    finished.push(p.process_name);
+                } else {
+                    unfinished.push(p.process_name);
+                }
+            }
+            document.getElementById('finishedProcesses').textContent = finished.length > 0 ? finished.join(', ') : 'None';
+            document.getElementById('unfinishedProcesses').textContent = unfinished.length > 0 ? unfinished.join(', ') : 'None';
+            document.getElementById('processSummary').classList.remove('hidden');
+            document.getElementById('modalMessage').textContent = 'Process End';
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('proceedBtn').disabled = true;
+            document.getElementById('finishBtn').disabled = true;
+            document.getElementById('editVariablesBtn').classList.remove('hidden');
+            document.getElementById('resetBtn').classList.remove('hidden');
+            document.getElementById('currentTimeLabel').textContent = 'End Time: ' + (currentSimTime + 1);
         }
         
         function FCFSFF() {
@@ -541,9 +747,9 @@
                         totalIF += hole_arr[i] - parseInt(p.mr);
                         blockUsed = true;
                         if (runningProcess === p.process_name) {
-                            cell.style.backgroundColor = 'lightgreen';
+                            cell.style.backgroundColor = '#2d5f2d';
                         } else {
-                            cell.style.backgroundColor = 'yellow';
+                            cell.style.backgroundColor = '#4a4a2d';
                         }
                         break;
                     }
@@ -606,10 +812,7 @@
             updateLiveTable();
             
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             
             currentSimTime++;
@@ -638,7 +841,7 @@
             document.getElementById('tableBody3').innerHTML = '';
             
             // Clear memory blocks
-            while (headerRow.children.length > 4) {
+            while (headerRow.children.length > 5) {
                 headerRow.removeChild(headerRow.children[1]);
             }
             const dataRow = document.getElementById('dataRow');
@@ -660,14 +863,64 @@
             
             // Disable action buttons
             document.getElementById('proceedBtn').disabled = true;
+            document.getElementById('proceedBtn').classList.add('hidden');
             document.getElementById('finishBtn').disabled = true;
+            document.getElementById('finishBtn').classList.add('hidden');
+            document.getElementById('editVariablesBtn').classList.add('hidden');
             document.getElementById('resetBtn').classList.add('hidden');
+            
+            // Hide time display and labels
+            document.getElementById('timeDisplay').classList.add('hidden');
+            document.getElementById('labelsContainer').classList.add('hidden');
+            document.getElementById('algorithmLabel').classList.add('hidden');
+            document.getElementById('allocationLabel').classList.add('hidden');
+            document.getElementById('currentTimeLabel').textContent = 'Current Time: 0';
+            
+            // Hide process summary
+            document.getElementById('processSummary').classList.add('hidden');
+            
+            // Show edit controls
+            document.getElementById('editControls').classList.remove('hidden');
             
             // Show input sections
             showInputSections();
             
+            // Hide edit button
+            document.getElementById('editBtn').classList.add('hidden');
+            
             // Close modal
             document.getElementById('modal').classList.add('hidden');
+        }
+
+        function editVariables() {
+            currentSimTime = 0;
+            processQueue = [];
+            allocatedProcesses = {};
+            const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '<tr id="dataRow"></tr>';
+            document.getElementById('liveTableContainer').classList.add('hidden');
+            document.getElementById('tableBody3').innerHTML = '';
+            document.getElementById('addProcessBtn').disabled = false;
+            document.getElementById('generateSampleBtn').disabled = false;
+            document.getElementById('clearTableBtn').disabled = false;
+            document.getElementById('addBtn').disabled = false;
+            document.getElementById('clearBtn').disabled = false;
+            document.getElementById('algorithm_options').disabled = false;
+            document.getElementById('allocation_strat_options').disabled = false;
+            document.getElementById('finalizeBtn').disabled = false;
+            document.getElementById('proceedBtn').classList.add('hidden');
+            document.getElementById('finishBtn').classList.add('hidden');
+            document.getElementById('editVariablesBtn').classList.add('hidden');
+            document.getElementById('resetBtn').classList.add('hidden');
+            document.getElementById('timeDisplay').classList.add('hidden');
+            document.getElementById('labelsContainer').classList.add('hidden');
+            document.getElementById('processSummary').classList.add('hidden');
+            document.getElementById('currentTimeLabel').textContent = 'Current Time: 0';
+            document.getElementById('editControls').classList.remove('hidden');
+            if (p_arr.length > 0) {
+                document.getElementById('editBtn').classList.remove('hidden');
+            }
+            showInputSections();
         }
 
 
@@ -762,9 +1015,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -807,10 +1060,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -859,9 +1109,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -904,10 +1154,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -956,9 +1203,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1001,10 +1248,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1061,9 +1305,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1108,10 +1352,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1169,9 +1410,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1227,10 +1468,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1294,9 +1532,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1352,10 +1590,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1419,9 +1654,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1477,10 +1712,7 @@
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1512,13 +1744,21 @@
                         pState.allocated = true;
                         pState.memoryBlock = i;
                         blockStatus[i] = true;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
                         break;
                     }
                 }
             }
+            
+            runningProcess = null;
+            let highestPriority = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
+                    highestPriority = parseInt(p.priority);
+                    runningProcess = p.process_name;
+                }
+            }
+            
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
                 if (pState.allocated && pState.remainingBurst > 0) {
@@ -1529,9 +1769,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1556,28 +1796,16 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
                     pState.remainingBurst--;
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
-                        }
-                    }
-                }
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1611,13 +1839,21 @@
                         pState.memoryBlock = i;
                         blockStatus[i] = true;
                         nextFitIndex = (i + 1) % dynamicColumnCount;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
                         break;
                     }
                 }
             }
+            
+            runningProcess = null;
+            let highestPriority = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
+                    highestPriority = parseInt(p.priority);
+                    runningProcess = p.process_name;
+                }
+            }
+            
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
                 if (pState.allocated && pState.remainingBurst > 0) {
@@ -1628,9 +1864,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1655,28 +1891,16 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
                     pState.remainingBurst--;
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
-                        }
-                    }
-                }
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1718,11 +1942,19 @@
                     pState.allocated = true;
                     pState.memoryBlock = bestFitIndex;
                     blockStatus[bestFitIndex] = true;
-                    if (!runningProcess) {
-                        runningProcess = p.process_name;
-                    }
                 }
             }
+            
+            runningProcess = null;
+            let highestPriority = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
+                    highestPriority = parseInt(p.priority);
+                    runningProcess = p.process_name;
+                }
+            }
+            
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
                 if (pState.allocated && pState.remainingBurst > 0) {
@@ -1733,9 +1965,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1760,28 +1992,16 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
                     pState.remainingBurst--;
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
-                        }
-                    }
-                }
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
@@ -1823,11 +2043,19 @@
                     pState.allocated = true;
                     pState.memoryBlock = worstFitIndex;
                     blockStatus[worstFitIndex] = true;
-                    if (!runningProcess) {
-                        runningProcess = p.process_name;
-                    }
                 }
             }
+            
+            runningProcess = null;
+            let highestPriority = Infinity;
+            for (let p of processQueue) {
+                const pState = allocatedProcesses[p.process_name];
+                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
+                    highestPriority = parseInt(p.priority);
+                    runningProcess = p.process_name;
+                }
+            }
+            
             for (let p of processQueue) {
                 const pState = allocatedProcesses[p.process_name];
                 if (pState.allocated && pState.remainingBurst > 0) {
@@ -1838,9 +2066,9 @@
                     totalIF += hole_arr[i] - parseInt(p.mr);
                     blockStatus[i] = true;
                     if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = 'lightgreen';
+                        cell.style.backgroundColor = '#2d5f2d';
                     } else {
-                        cell.style.backgroundColor = 'yellow';
+                        cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
@@ -1865,29 +2093,18 @@
             newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
             newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
             newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             if (runningProcess) {
                 const pState = allocatedProcesses[runningProcess];
                 if (pState.remainingBurst > 0) {
                     pState.remainingBurst--;
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
-                        }
-                    }
-                }
             }
             updateLiveTable();
             if (checkAllProcessesDone()) {
-                document.getElementById('modalMessage').textContent = 'Process End';
-                document.getElementById('modal').classList.remove('hidden');
-                document.getElementById('proceedBtn').disabled = true;
-                document.getElementById('resetBtn').classList.remove('hidden');
+                showProcessSummary();
             }
             currentSimTime++;
             document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
         }
+
