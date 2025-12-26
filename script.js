@@ -37,6 +37,14 @@
                 dynamicColumnCount++;
                 columnInput.value = '';
                 
+                // Add to partition table
+                const partitionTableBody = document.getElementById('partitionTableBody');
+                if (partitionTableBody.querySelector('tr td')?.textContent === '-') {
+                    partitionTableBody.innerHTML = '';
+                }
+                const newRow = partitionTableBody.insertRow();
+                newRow.insertCell(0).textContent = columnName;
+                
                 // Show clear button
                 clearBtn.classList.remove('hidden');
             }
@@ -51,15 +59,26 @@
             dynamicColumnCount = 0;
             hole_arr.length = 0;
             clearBtn.classList.add('hidden');
+            
+            // Clear partition table
+            const partitionTableBody = document.getElementById('partitionTableBody');
+            partitionTableBody.innerHTML = '<tr><td>-</td></tr>';
         }
          
         class Process {
           constructor(process_name, arrival_time, burst_time, mr, priority) {
-            this.process_name = process_name;
-            this.arrival_time = arrival_time;
-            this.burst_time = burst_time;
-            this.mr = mr;
-            this.priority = priority || null;
+            this.process_name = process_name; // string
+            this.arrival_time = arrival_time; // int
+            this.burst_time = burst_time; // int
+            this.mr = mr; // int
+            this.priority = priority || null; // number/int
+
+            this.start_time = -1; // int
+            this.end_time = 0; // int
+            this.running = false; // boolean
+            this.allocated = false; // boolean
+            this.waiting = false; // boolean
+            this.finished = false; // boolean
           }
         }
 
@@ -443,6 +462,12 @@
                 // Enable action buttons
                 document.getElementById('proceedBtn').disabled = false;
                 document.getElementById('proceedBtn').classList.remove('hidden');
+
+                document.getElementById('algorithmLabel').classList.remove('hidden');
+                document.getElementById('allocationLabel').classList.remove('hidden');
+
+                document.getElementById('repeatBtn').disabled = false;
+                document.getElementById('repeatBtn').classList.remove('hidden');
                 document.getElementById('finishBtn').disabled = false;
                 document.getElementById('finishBtn').classList.remove('hidden');
                 document.getElementById('editVariablesBtn').classList.remove('hidden');
@@ -460,6 +485,9 @@
                 
                 // Show labels
                 showAlgorithmLabels();
+                
+                // Create arrival timeline
+                createArrivalTimeline();
                 
                 // Hide input sections
                 hideInputSections();
@@ -556,6 +584,40 @@
             }
         }
 
+        function repeatSimulation() {
+
+            currentSimTime = 0;
+            processQueue = [];
+            allocatedProcesses = {};
+            runningProcess = null;
+            nextFitIndex = 0;
+            
+            // Reset all Process properties to original values
+            for (let p of p_arr) {
+                p.running = false;
+                p.allocated = false;
+                p.waiting = false;
+                p.finished = false;
+                p.start_time = -1;
+                p.end_time = 0;
+                p.memoryBlock = undefined;
+            }
+            
+            const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
+            tableBody.innerHTML = '<tr id="dataRow"></tr>';
+            const tableBody3 = document.getElementById('tableBody3');
+            tableBody3.innerHTML = '';
+            cloneProcessTable();
+            document.getElementById('proceedBtn').disabled = false;
+            document.getElementById('repeatBtn').disabled = false;
+            document.getElementById('finishBtn').disabled = false;
+            document.getElementById('currentTimeLabel').textContent = 'Current Time: 0';
+            document.getElementById('arrivalTimeline').classList.add('hidden');
+            document.getElementById('processSummary').classList.add('hidden');
+            document.getElementById('processSummary').classList.add('hidden');
+            document.getElementById('processSummary2').classList.add('hidden');
+        }
+
         function startStep() {
             if (currentSimTime === 0) {
                 processQueue = [...p_arr].sort((a, b) => a.arrival_time - b.arrival_time);
@@ -596,23 +658,25 @@
                 });
             }
             
-            while (!checkAllProcessesDone()) {
-                switch(selectedAlgorithm) {
-                    case 'FCFS_first_fit': FCFSFF(); break;
-                    case 'FCFS_next_fit': FCFSNF(); break;
-                    case 'FCFS_best_fit': FCFSBF(); break;
-                    case 'FCFS_worst_fit': FCFSWF(); break;
-                    case 'SJF_first_fit': SJFFF(); break;
-                    case 'SJF_next_fit': SJFNF(); break;
-                    case 'SJF_best_fit': SJFBF(); break;
-                    case 'SJF_worst_fit': SJFWF(); break;
-                    case 'NPP_first_fit': NPPFF(); break;
-                    case 'NPP_next_fit': NPPNF(); break;
-                    case 'NPP_best_fit': NPPBF(); break;
-                    case 'NPP_worst_fit': NPPWF(); break;
+            // Check if all processes that can fit are done
+            let allDone = false;
+            while (!allDone) {
+                FCFSFF();
+                
+                allDone = true;
+                for (let p of p_arr) {
+                    const maxPartition = Math.max(...hole_arr);
+                    if (parseInt(p.mr) <= maxPartition) {
+                        if (!p.finished) {
+                            allDone = false;
+                            break;
+                        }
+                    }
                 }
             }
         }
+
+        
 
         function closeModal() {
             document.getElementById('modal').classList.add('hidden');
@@ -638,11 +702,12 @@
             rows.forEach(row => {
                 const processName = row.cells[0].textContent;
                 const pState = allocatedProcesses[processName];
+                const process = p_arr.find(p => p.process_name === processName);
                 
                 if (pState) {
                     row.cells[1].textContent = pState.remainingBurst;
                     
-                    if (runningProcess === processName) {
+                    if (process && process.running) {
                         row.style.border = '3px solid #4CAF50';
                         row.style.boxShadow = '0 0 10px rgba(76, 175, 80, 0.5)';
                     } else {
@@ -687,30 +752,206 @@
             return true;
         }
         
+        function createGanttChart() {
+            const finishedProcesses = p_arr.filter(p => p.finished && p.start_time >= 0).sort((a, b) => a.start_time - b.start_time);
+            
+            if (finishedProcesses.length === 0) return '';
+            
+            const ganttContainer = document.getElementById('ganttChart');
+            const tickMarksContainer = document.getElementById('ganttTickMarks');
+            const numberLabelsContainer = document.getElementById('ganttNumberLabels');
+            
+            ganttContainer.innerHTML = '';
+            tickMarksContainer.innerHTML = '';
+            numberLabelsContainer.innerHTML = '';
+            
+            const totalTime = Math.max(...finishedProcesses.map(p => p.end_time));
+            const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B', '#795548'];
+            
+            let currentTime = 0;
+            
+            finishedProcesses.forEach((process, index) => {
+                // Add gap if there's idle time before this process
+                if (process.start_time > currentTime) {
+                    const gapDiv = document.createElement('div');
+                    gapDiv.className = 'gantt-process';
+                    gapDiv.style.width = ((process.start_time - currentTime) / totalTime) * 100 + '%';
+                    gapDiv.style.backgroundColor = '#333';
+                    gapDiv.textContent = 'IDLE';
+                    gapDiv.style.fontSize = '10px';
+                    ganttContainer.appendChild(gapDiv);
+                    
+                    // Add corresponding tick
+                    const gapTick = document.createElement('div');
+                    gapTick.className = 'gantt-tick';
+                    gapTick.style.flex = (process.start_time - currentTime);
+                    tickMarksContainer.appendChild(gapTick);
+                    
+                    // Add corresponding label
+                    const gapLabel = document.createElement('div');
+                    gapLabel.className = 'gantt-number-label';
+                    gapLabel.style.flex = (process.start_time - currentTime);
+                    numberLabelsContainer.appendChild(gapLabel);
+                }
+                
+                const duration = process.end_time - process.start_time;
+                const widthPercent = (duration / totalTime) * 100;
+                
+                const processDiv = document.createElement('div');
+                processDiv.className = 'gantt-process';
+                processDiv.style.width = widthPercent + '%';
+                processDiv.style.backgroundColor = colors[index % colors.length];
+                processDiv.textContent = process.process_name;
+                ganttContainer.appendChild(processDiv);
+                
+                // Add corresponding tick
+                const processTick = document.createElement('div');
+                processTick.className = 'gantt-tick';
+                processTick.style.flex = duration;
+                tickMarksContainer.appendChild(processTick);
+                
+                // Add corresponding label
+                const processLabel = document.createElement('div');
+                processLabel.className = 'gantt-number-label';
+                processLabel.style.flex = duration;
+                processLabel.textContent = process.start_time;
+                numberLabelsContainer.appendChild(processLabel);
+                
+                currentTime = process.end_time;
+            });
+            
+            // Add final tick and label
+            const finalTick = document.createElement('div');
+            finalTick.className = 'gantt-tick';
+            tickMarksContainer.appendChild(finalTick);
+            
+            const finalLabel = document.createElement('div');
+            finalLabel.className = 'gantt-number-label';
+            finalLabel.textContent = totalTime;
+            numberLabelsContainer.appendChild(finalLabel);
+        }
+
         function showProcessSummary() {
             const finished = [];
             const unfinished = [];
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst === 0) {
+            
+            let processDetails = '';
+            for (let p of p_arr) {
+                if (p.start_time >= 0 && p.end_time > 0) {
+                    processDetails += `${p.process_name}: Start=${p.start_time}, End=${p.end_time}\n`;
+                }
+                if (p.finished) {
                     finished.push(p.process_name);
                 } else {
                     unfinished.push(p.process_name);
                 }
             }
-            document.getElementById('finishedProcesses').textContent = finished.length > 0 ? finished.join(', ') : 'None';
-            document.getElementById('unfinishedProcesses').textContent = unfinished.length > 0 ? unfinished.join(', ') : 'None';
+            
+            createGanttChart();
+            
+            
+            const finishedEl = document.getElementById('finishedProcesses');
+            finishedEl.textContent = finished.length > 0 ? finished.join(', ') : 'None';
+            finishedEl.style.color = '#4CAF50';
+            const unfinishedEl = document.getElementById('unfinishedProcesses');
+            unfinishedEl.textContent = unfinished.length > 0 ? unfinished.join(', ') : 'None';
+            unfinishedEl.style.color = unfinished.length > 0 ? '#f44336' : '#e0e0e0';
             document.getElementById('processSummary').classList.remove('hidden');
+            document.getElementById('processSummary2').classList.remove('hidden');
             document.getElementById('modalMessage').textContent = 'Process End';
             document.getElementById('modal').classList.remove('hidden');
             document.getElementById('proceedBtn').disabled = true;
             document.getElementById('finishBtn').disabled = true;
             document.getElementById('editVariablesBtn').classList.remove('hidden');
             document.getElementById('resetBtn').classList.remove('hidden');
-            document.getElementById('currentTimeLabel').textContent = 'End Time: ' + (currentSimTime + 1);
+            document.getElementById('currentTimeLabel').classList.add('hidden');
+        }
+        function createArrivalTimeline() {
+            const arrivalContainer = document.getElementById('arrivalChart');
+            const arrivalTickMarks = document.getElementById('arrivalTickMarks');
+            const arrivalNumberLabels = document.getElementById('arrivalNumberLabels');
+            
+            arrivalContainer.innerHTML = '';
+            arrivalTickMarks.innerHTML = '';
+            arrivalNumberLabels.innerHTML = '';
+            
+            // Group processes by arrival time
+            const processGroups = {};
+            p_arr.forEach(process => {
+                const arrivalTime = parseInt(process.arrival_time);
+                if (!processGroups[arrivalTime]) {
+                    processGroups[arrivalTime] = [];
+                }
+                processGroups[arrivalTime].push(process.process_name);
+            });
+            
+            const sortedTimes = Object.keys(processGroups).map(t => parseInt(t)).sort((a, b) => a - b);
+            const maxArrivalTime = Math.max(...sortedTimes);
+            
+            let currentTime = 0;
+            
+            sortedTimes.forEach((arrivalTime, index) => {
+                // Add gap if needed
+                if (arrivalTime > currentTime) {
+                    const gapDiv = document.createElement('div');
+                    gapDiv.className = 'gantt-process';
+                    gapDiv.style.width = ((arrivalTime - currentTime) / (maxArrivalTime + 1)) * 100 + '%';
+                    gapDiv.style.backgroundColor = '#333';
+                    gapDiv.style.fontSize = '10px';
+                    arrivalContainer.appendChild(gapDiv);
+                    
+                    const gapTick = document.createElement('div');
+                    gapTick.className = 'gantt-tick';
+                    gapTick.style.flex = (arrivalTime - currentTime);
+                    arrivalTickMarks.appendChild(gapTick);
+                    
+                    const gapLabel = document.createElement('div');
+                    gapLabel.className = 'gantt-number-label';
+                    gapLabel.style.flex = (arrivalTime - currentTime);
+                    arrivalNumberLabels.appendChild(gapLabel);
+                }
+                
+                // Add process arrival
+                const processDiv = document.createElement('div');
+                processDiv.className = 'gantt-process';
+                processDiv.style.width = (1 / (maxArrivalTime + 1)) * 100 + '%';
+                arrivalContainer.appendChild(processDiv);
+                
+                const processTick = document.createElement('div');
+                processTick.className = 'gantt-tick';
+                processTick.style.flex = 1;
+                processTick.setAttribute('data-process', processGroups[arrivalTime].join(', '));
+                arrivalTickMarks.appendChild(processTick);
+                
+                const processLabel = document.createElement('div');
+                processLabel.className = 'gantt-number-label';
+                processLabel.style.flex = 1;
+                processLabel.textContent = arrivalTime;
+                arrivalNumberLabels.appendChild(processLabel);
+                
+                currentTime = arrivalTime + 1;
+            });
+            
+            // Add final tick
+            const finalTick = document.createElement('div');
+            finalTick.className = 'gantt-tick';
+            arrivalTickMarks.appendChild(finalTick);
+            
+            document.getElementById('arrivalTimeline').classList.remove('hidden');
         }
         
         function FCFSFF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
             
@@ -722,49 +963,109 @@
             let totalMemory = 0;
             const blockStatus = [];
             
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
                 const cell = newRow.insertCell(i + 1);
                 cell.textContent = '-';
                 totalMemory += hole_arr[i];
-                let blockUsed = false;
-                
-                for (let p of processQueue) {
-                    const pState = allocatedProcesses[p.process_name];
-                    
-                    if (parseInt(p.arrival_time) <= currentSimTime && !pState.allocated) {
-                        if (parseInt(p.mr) <= hole_arr[i]) {
-                            pState.allocated = true;
-                            pState.memoryBlock = i;
-                            if (!runningProcess) {
-                                runningProcess = p.process_name;
-                            }
-                        }
-                    }
-                    
-                    if (pState.allocated && pState.memoryBlock === i && pState.remainingBurst > 0) {
-                        cell.textContent = p.process_name + '(' + p.mr + ')';
-                        totalAllocated += parseInt(p.mr);
-                        totalIF += hole_arr[i] - parseInt(p.mr);
-                        blockUsed = true;
-                        if (runningProcess === p.process_name) {
-                            cell.style.backgroundColor = '#2d5f2d';
-                        } else {
-                            cell.style.backgroundColor = '#4a4a2d';
-                        }
-                        break;
-                    }
-                }
-                blockStatus.push(blockUsed);
+                blockStatus.push(false);
             }
             
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
+                }
+            }
             
+            // Check for newly arrived processes and allocate memory (First Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
+                            blockStatus[i] = true;
+                            allocated = true;
+                            break;
+                        }
+                    }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
+                }
+            }
+            
+            // Determine running process (FCFS - earliest arrival time among allocated processes)
+            let runningProcess = null;
+            let earliestArrival = Infinity;
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && parseInt(p.arrival_time) < earliestArrival) {
+                    earliestArrival = parseInt(p.arrival_time);
+                    runningProcess = p;
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
+                    cell.textContent = p.process_name + '(' + p.mr + ')';
+                    totalAllocated += parseInt(p.mr);
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
+                        cell.style.backgroundColor = '#2d5f2d';
+                    } else {
+                        cell.style.backgroundColor = '#4a4a2d';
+                    }
+                }
+            }
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
+                    }
+                }
+            }
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
+                }
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
             for (let i = 0; i < dynamicColumnCount; i++) {
                 if (!blockStatus[i]) {
                     if (waitingJobs.length > 0) {
                         const canFit = waitingJobs.some(jobName => {
-                            const job = processQueue.find(p => p.process_name === jobName);
+                            const job = p_arr.find(p => p.process_name === jobName);
                             return parseInt(job.mr) <= hole_arr[i];
                         });
                         if (!canFit) {
@@ -792,26 +1093,21 @@
             const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
             waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
             
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
-                }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
-                        }
+            updateLiveTable();
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
                     }
                 }
             }
             
-            updateLiveTable();
-            
-            if (checkAllProcessesDone()) {
+            if (allDone) {
                 showProcessSummary();
             }
             
@@ -864,6 +1160,8 @@
             // Disable action buttons
             document.getElementById('proceedBtn').disabled = true;
             document.getElementById('proceedBtn').classList.add('hidden');
+            document.getElementById('repeatBtn').disabled = true;
+            document.getElementById('repeatBtn').classList.add('hidden');
             document.getElementById('finishBtn').disabled = true;
             document.getElementById('finishBtn').classList.add('hidden');
             document.getElementById('editVariablesBtn').classList.add('hidden');
@@ -874,6 +1172,9 @@
             document.getElementById('labelsContainer').classList.add('hidden');
             document.getElementById('algorithmLabel').classList.add('hidden');
             document.getElementById('allocationLabel').classList.add('hidden');
+            document.getElementById('arrivalTimeline').classList.add('hidden');
+            document.getElementById('processSummary2').classList.add('hidden');
+
             document.getElementById('currentTimeLabel').textContent = 'Current Time: 0';
             
             // Hide process summary
@@ -893,6 +1194,7 @@
         }
 
         function editVariables() {
+            repeatSimulation();
             currentSimTime = 0;
             processQueue = [];
             allocatedProcesses = {};
@@ -909,6 +1211,14 @@
             document.getElementById('allocation_strat_options').disabled = false;
             document.getElementById('finalizeBtn').disabled = false;
             document.getElementById('proceedBtn').classList.add('hidden');
+            document.getElementById('repeatBtn').classList.add('hidden');
+            document.getElementById('processSummary').classList.add('hidden');
+            document.getElementById('processSummary2').classList.add('hidden');
+            document.getElementById('orderTimeline').classList.add('hidden');
+            document.getElementById('arrivalTimeline').classList.add('hidden');
+            
+            document.getElementById('algorithmLabel').classList.add('hidden');
+            document.getElementById('allocationLabel').classList.add('hidden');
             document.getElementById('finishBtn').classList.add('hidden');
             document.getElementById('editVariablesBtn').classList.add('hidden');
             document.getElementById('resetBtn').classList.add('hidden');
@@ -980,107 +1290,226 @@
 
         // FCFS with Next Fit
         function FCFSNF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (parseInt(p.arrival_time) <= currentSimTime && !pState.allocated) {
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
+                }
+            }
+            
+            // Check for newly arrived processes and allocate memory (Next Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
                     for (let j = 0; j < dynamicColumnCount; j++) {
                         const i = (nextFitIndex + j) % dynamicColumnCount;
                         if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                            pState.allocated = true;
-                            pState.memoryBlock = i;
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
                             blockStatus[i] = true;
                             nextFitIndex = (i + 1) % dynamicColumnCount;
-                            if (!runningProcess) {
-                                runningProcess = p.process_name;
-                            }
+                            allocated = true;
                             break;
                         }
                     }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
                 }
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            }
+            
+            // Determine running process (FCFS - earliest arrival time among allocated processes)
+            let runningProcess = null;
+            let earliestArrival = Infinity;
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && parseInt(p.arrival_time) < earliestArrival) {
+                    earliestArrival = parseInt(p.arrival_time);
+                    runningProcess = p;
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // FCFS with Best Fit
         function FCFSBF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (parseInt(p.arrival_time) <= currentSimTime && !pState.allocated) {
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
+                }
+            }
+            
+            // Check for newly arrived processes and allocate memory (Best Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
                     let bestFitIndex = -1;
                     let minWastage = Infinity;
                     for (let i = 0; i < dynamicColumnCount; i++) {
@@ -1093,88 +1522,177 @@
                         }
                     }
                     if (bestFitIndex !== -1) {
-                        pState.allocated = true;
-                        pState.memoryBlock = bestFitIndex;
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = bestFitIndex;
                         blockStatus[bestFitIndex] = true;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
                     }
                 }
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            }
+            
+            // Determine running process (FCFS - earliest arrival time among allocated processes)
+            let runningProcess = null;
+            let earliestArrival = Infinity;
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && parseInt(p.arrival_time) < earliestArrival) {
+                    earliestArrival = parseInt(p.arrival_time);
+                    runningProcess = p;
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // FCFS with Worst Fit
         function FCFSWF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (parseInt(p.arrival_time) <= currentSimTime && !pState.allocated) {
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
+                }
+            }
+            
+            // Check for newly arrived processes and allocate memory (Worst Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
                     let worstFitIndex = -1;
                     let maxWastage = -1;
                     for (let i = 0; i < dynamicColumnCount; i++) {
@@ -1187,924 +1705,1717 @@
                         }
                     }
                     if (worstFitIndex !== -1) {
-                        pState.allocated = true;
-                        pState.memoryBlock = worstFitIndex;
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = worstFitIndex;
                         blockStatus[worstFitIndex] = true;
-                        if (!runningProcess) {
-                            runningProcess = p.process_name;
-                        }
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
                     }
                 }
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            }
+            
+            // Determine running process (FCFS - earliest arrival time among allocated processes)
+            let runningProcess = null;
+            let earliestArrival = Infinity;
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && parseInt(p.arrival_time) < earliestArrival) {
+                    earliestArrival = parseInt(p.arrival_time);
+                    runningProcess = p;
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0) {
-                            runningProcess = p.process_name;
-                            break;
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // SJF with First Fit
         function SJFFF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.burst_time) - parseInt(b.burst_time));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        pState.allocated = true;
-                        pState.memoryBlock = i;
-                        blockStatus[i] = true;
-                        break;
+            
+            // Check for newly arrived processes and allocate memory (First Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
+                            blockStatus[i] = true;
+                            allocated = true;
+                            break;
+                        }
+                    }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
                     }
                 }
             }
             
-            runningProcess = null;
-            let shortestBurst = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                    shortestBurst = pState.remainingBurst;
-                    runningProcess = p.process_name;
+            // Determine running process (SJF - non-preemptive: continue current running process or select shortest burst time)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
                 }
             }
             
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            // If no process is currently running, select shortest remaining burst time among allocated processes
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const pState = allocatedProcesses[p.process_name];
+                        if (pState && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
             
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    let shortestBurst = Infinity;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                            shortestBurst = pState.remainingBurst;
-                            runningProcess = p.process_name;
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // SJF with Next Fit
         function SJFNF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.burst_time) - parseInt(b.burst_time));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                for (let j = 0; j < dynamicColumnCount; j++) {
-                    const i = (nextFitIndex + j) % dynamicColumnCount;
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        pState.allocated = true;
-                        pState.memoryBlock = i;
-                        blockStatus[i] = true;
-                        nextFitIndex = (i + 1) % dynamicColumnCount;
-                        break;
+            
+            // Check for newly arrived processes and allocate memory (Next Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
+                    for (let j = 0; j < dynamicColumnCount; j++) {
+                        const i = (nextFitIndex + j) % dynamicColumnCount;
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
+                            blockStatus[i] = true;
+                            nextFitIndex = (i + 1) % dynamicColumnCount;
+                            allocated = true;
+                            break;
+                        }
+                    }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
                     }
                 }
             }
             
-            runningProcess = null;
-            let shortestBurst = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                    shortestBurst = pState.remainingBurst;
-                    runningProcess = p.process_name;
+            // Determine running process (SJF - non-preemptive: continue current running process or select shortest burst time)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
                 }
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            
+            // If no process is currently running, select shortest remaining burst time among allocated processes
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const pState = allocatedProcesses[p.process_name];
+                        if (pState && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
+                    }
+                }
+            }
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
+                }
+            }
+            
+            // Calculate external fragmentation
             let totalEF = 0;
             for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
-                    }
-                }
-            }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            
-            if (!runningProcess) {
-                let shortestBurst = Infinity;
-                for (let p of processQueue) {
-                    const pState = allocatedProcesses[p.process_name];
-                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                        shortestBurst = pState.remainingBurst;
-                        runningProcess = p.process_name;
-                    }
-                }
-            }
-            
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
-                }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    let shortestBurst = Infinity;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                            shortestBurst = pState.remainingBurst;
-                            runningProcess = p.process_name;
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // SJF with Best Fit
         function SJFBF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
-                }
-            }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.burst_time) - parseInt(b.burst_time));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                let bestFitIndex = -1;
-                let minWastage = Infinity;
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        const wastage = hole_arr[i] - parseInt(p.mr);
-                        if (wastage < minWastage) {
-                            minWastage = wastage;
-                            bestFitIndex = i;
-                        }
-                    }
-                }
-                if (bestFitIndex !== -1) {
-                    pState.allocated = true;
-                    pState.memoryBlock = bestFitIndex;
-                    blockStatus[bestFitIndex] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
             
-            runningProcess = null;
-            let shortestBurst = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                    shortestBurst = pState.remainingBurst;
-                    runningProcess = p.process_name;
+            // Check for newly arrived processes and allocate memory (Best Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let bestFitIndex = -1;
+                    let minWastage = Infinity;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            const wastage = hole_arr[i] - parseInt(p.mr);
+                            if (wastage < minWastage) {
+                                minWastage = wastage;
+                                bestFitIndex = i;
+                            }
+                        }
+                    }
+                    if (bestFitIndex !== -1) {
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = bestFitIndex;
+                        blockStatus[bestFitIndex] = true;
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
                 }
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            
+            // Determine running process (SJF - non-preemptive: continue current running process or select shortest burst time)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
+                }
+            }
+            
+            // If no process is currently running, select shortest remaining burst time among allocated processes
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const pState = allocatedProcesses[p.process_name];
+                        if (pState && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
+                    }
+                }
+            }
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
+                }
+            }
+            
+            // Calculate external fragmentation
             let totalEF = 0;
             for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
-                    }
-                }
-            }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            
-            if (!runningProcess) {
-                let shortestBurst = Infinity;
-                for (let p of processQueue) {
-                    const pState = allocatedProcesses[p.process_name];
-                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                        shortestBurst = pState.remainingBurst;
-                        runningProcess = p.process_name;
-                    }
-                }
-            }
-            
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
-                }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    let shortestBurst = Infinity;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                            shortestBurst = pState.remainingBurst;
-                            runningProcess = p.process_name;
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // SJF with Worst Fit
         function SJFWF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
-                }
-            }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.burst_time) - parseInt(b.burst_time));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                let worstFitIndex = -1;
-                let maxWastage = -1;
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        const wastage = hole_arr[i] - parseInt(p.mr);
-                        if (wastage > maxWastage) {
-                            maxWastage = wastage;
-                            worstFitIndex = i;
-                        }
-                    }
-                }
-                if (worstFitIndex !== -1) {
-                    pState.allocated = true;
-                    pState.memoryBlock = worstFitIndex;
-                    blockStatus[worstFitIndex] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
             
-            runningProcess = null;
-            let shortestBurst = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                    shortestBurst = pState.remainingBurst;
-                    runningProcess = p.process_name;
+            // Check for newly arrived processes and allocate memory (Worst Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let worstFitIndex = -1;
+                    let maxWastage = -1;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            const wastage = hole_arr[i] - parseInt(p.mr);
+                            if (wastage > maxWastage) {
+                                maxWastage = wastage;
+                                worstFitIndex = i;
+                            }
+                        }
+                    }
+                    if (worstFitIndex !== -1) {
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = worstFitIndex;
+                        blockStatus[worstFitIndex] = true;
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
                 }
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            
+            // Determine running process (SJF - non-preemptive: continue current running process or select shortest burst time)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
+                }
+            }
+            
+            // If no process is currently running, select shortest remaining burst time among allocated processes
+            if (!runningProcess) {
+                let shortestBurst = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const pState = allocatedProcesses[p.process_name];
+                        if (pState && pState.remainingBurst < shortestBurst) {
+                            shortestBurst = pState.remainingBurst;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
+                    }
+                }
+            }
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
+                }
+            }
+            
+            // Calculate external fragmentation
             let totalEF = 0;
             for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
-                    }
-                }
-            }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            
-            if (!runningProcess) {
-                let shortestBurst = Infinity;
-                for (let p of processQueue) {
-                    const pState = allocatedProcesses[p.process_name];
-                    if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                        shortestBurst = pState.remainingBurst;
-                        runningProcess = p.process_name;
-                    }
-                }
-            }
-            
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
-                }
-                if (pState.remainingBurst === 0) {
-                    runningProcess = null;
-                    let shortestBurst = Infinity;
-                    for (let p of processQueue) {
-                        const pState = allocatedProcesses[p.process_name];
-                        if (pState.allocated && pState.remainingBurst > 0 && pState.remainingBurst < shortestBurst) {
-                            shortestBurst = pState.remainingBurst;
-                            runningProcess = p.process_name;
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
                         }
                     }
                 }
             }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // NPP with First Fit
         function NPPFF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.priority) - parseInt(b.priority));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        pState.allocated = true;
-                        pState.memoryBlock = i;
-                        blockStatus[i] = true;
-                        break;
+            
+            // Check for newly arrived processes and allocate memory (First Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
+                            blockStatus[i] = true;
+                            allocated = true;
+                            break;
+                        }
+                    }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
                     }
                 }
             }
             
-            runningProcess = null;
-            let highestPriority = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
-                    highestPriority = parseInt(p.priority);
-                    runningProcess = p.process_name;
+            // Determine running process (NPP - non-preemptive: continue current running process or select highest priority)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
                 }
             }
             
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            // If no process is currently running, select highest priority (lowest number) among allocated processes
+            if (!runningProcess) {
+                let highestPriority = Infinity;
+                let earliestArrival = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const priority = parseInt(p.priority);
+                        const arrival = parseInt(p.arrival_time);
+                        if (priority < highestPriority || (priority === highestPriority && arrival < earliestArrival)) {
+                            highestPriority = priority;
+                            earliestArrival = arrival;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
             
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
             }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
+                        }
+                    }
+                }
+            }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // NPP with Next Fit
         function NPPNF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.priority) - parseInt(b.priority));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                for (let j = 0; j < dynamicColumnCount; j++) {
-                    const i = (nextFitIndex + j) % dynamicColumnCount;
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        pState.allocated = true;
-                        pState.memoryBlock = i;
-                        blockStatus[i] = true;
-                        nextFitIndex = (i + 1) % dynamicColumnCount;
+            
+            // Check for newly arrived processes and allocate memory (Next Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let allocated = false;
+                    for (let j = 0; j < dynamicColumnCount; j++) {
+                        const i = (nextFitIndex + j) % dynamicColumnCount;
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            p.allocated = true;
+                            p.waiting = false;
+                            p.memoryBlock = i;
+                            blockStatus[i] = true;
+                            nextFitIndex = (i + 1) % dynamicColumnCount;
+                            allocated = true;
+                            break;
+                        }
+                    }
+                    if (!allocated) {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
+                }
+            }
+            
+            // Determine running process (NPP - non-preemptive: continue current running process or select highest priority)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
+                }
+            }
+            
+            // If no process is currently running, select highest priority (lowest number) among allocated processes
+            if (!runningProcess) {
+                let highestPriority = Infinity;
+                let earliestArrival = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const priority = parseInt(p.priority);
+                        const arrival = parseInt(p.arrival_time);
+                        if (priority < highestPriority || (priority === highestPriority && arrival < earliestArrival)) {
+                            highestPriority = priority;
+                            earliestArrival = arrival;
+                            runningProcess = p;
+                        }
+                    }
+                }
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
+                }
+            }
+            
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
+                    cell.textContent = p.process_name + '(' + p.mr + ')';
+                    totalAllocated += parseInt(p.mr);
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
+                        cell.style.backgroundColor = '#2d5f2d';
+                    } else {
+                        cell.style.backgroundColor = '#4a4a2d';
+                    }
+                }
+            }
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
+                    }
+                }
+            }
+            
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
+                }
+            }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
+                        }
+                    }
+                }
+            }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
+            updateLiveTable();
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
                         break;
                     }
                 }
             }
             
-            runningProcess = null;
-            let highestPriority = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
-                    highestPriority = parseInt(p.priority);
-                    runningProcess = p.process_name;
-                }
-            }
-            
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
-                    cell.textContent = p.process_name + '(' + p.mr + ')';
-                    totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
-                        cell.style.backgroundColor = '#2d5f2d';
-                    } else {
-                        cell.style.backgroundColor = '#4a4a2d';
-                    }
-                }
-            }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
-                    }
-                }
-            }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
-            
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
-                }
-            }
-            updateLiveTable();
-            if (checkAllProcessesDone()) {
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // NPP with Best Fit
         function NPPBF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.priority) - parseInt(b.priority));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                let bestFitIndex = -1;
-                let minWastage = Infinity;
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        const wastage = hole_arr[i] - parseInt(p.mr);
-                        if (wastage < minWastage) {
-                            minWastage = wastage;
-                            bestFitIndex = i;
+            
+            // Check for newly arrived processes and allocate memory (Best Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let bestFitIndex = -1;
+                    let minWastage = Infinity;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            const wastage = hole_arr[i] - parseInt(p.mr);
+                            if (wastage < minWastage) {
+                                minWastage = wastage;
+                                bestFitIndex = i;
+                            }
+                        }
+                    }
+                    if (bestFitIndex !== -1) {
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = bestFitIndex;
+                        blockStatus[bestFitIndex] = true;
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
+                }
+            }
+            
+            // Determine running process (NPP - non-preemptive: continue current running process or select highest priority)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
+                }
+            }
+            
+            // If no process is currently running, select highest priority (lowest number) among allocated processes
+            if (!runningProcess) {
+                let highestPriority = Infinity;
+                let earliestArrival = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const priority = parseInt(p.priority);
+                        const arrival = parseInt(p.arrival_time);
+                        if (priority < highestPriority || (priority === highestPriority && arrival < earliestArrival)) {
+                            highestPriority = priority;
+                            earliestArrival = arrival;
+                            runningProcess = p;
                         }
                     }
                 }
-                if (bestFitIndex !== -1) {
-                    pState.allocated = true;
-                    pState.memoryBlock = bestFitIndex;
-                    blockStatus[bestFitIndex] = true;
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
                 }
             }
             
-            runningProcess = null;
-            let highestPriority = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
-                    highestPriority = parseInt(p.priority);
-                    runningProcess = p.process_name;
-                }
-            }
-            
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
             
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
             }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
+                        }
+                    }
+                }
+            }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
         // NPP with Worst Fit
         function NPPWF() {
+            // Check if any unfinished process can fit in any partition
+            const unfinishedProcesses = p_arr.filter(p => !p.finished);
+            const maxPartitionSize = Math.max(...hole_arr);
+            const canAnyProcessFit = unfinishedProcesses.some(p => parseInt(p.mr) <= maxPartitionSize);
+            
+            if (unfinishedProcesses.length > 0 && !canAnyProcessFit) {
+                document.getElementById('modalMessage').textContent = 'Program ends - No remaining processes can fit in any partition';
+                document.getElementById('modal').classList.remove('hidden');
+                return;
+            }
+            
             const tableBody = document.getElementById('dataTable').getElementsByTagName('tbody')[0];
             const newRow = tableBody.insertRow();
-            newRow.insertCell(0).textContent = currentSimTime;
-            let totalIF = 0, totalAllocated = 0, totalMemory = 0;
+            
+            const timeCell = newRow.insertCell(0);
+            timeCell.textContent = currentSimTime;
+            
+            let totalIF = 0;
+            let totalAllocated = 0;
+            let totalMemory = 0;
             const blockStatus = [];
+            
+            // Initialize memory blocks
             for (let i = 0; i < dynamicColumnCount; i++) {
-                newRow.insertCell(i + 1).textContent = '-';
+                const cell = newRow.insertCell(i + 1);
+                cell.textContent = '-';
                 totalMemory += hole_arr[i];
                 blockStatus.push(false);
             }
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    blockStatus[pState.memoryBlock] = true;
+            
+            // Mark blocks occupied by already allocated processes
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    blockStatus[p.memoryBlock] = true;
                 }
             }
-            const arrivedProcesses = processQueue.filter(p => parseInt(p.arrival_time) <= currentSimTime && !allocatedProcesses[p.process_name].allocated).sort((a, b) => parseInt(a.priority) - parseInt(b.priority));
-            for (let p of arrivedProcesses) {
-                const pState = allocatedProcesses[p.process_name];
-                let worstFitIndex = -1;
-                let maxWastage = -1;
-                for (let i = 0; i < dynamicColumnCount; i++) {
-                    if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
-                        const wastage = hole_arr[i] - parseInt(p.mr);
-                        if (wastage > maxWastage) {
-                            maxWastage = wastage;
-                            worstFitIndex = i;
+            
+            // Check for newly arrived processes and allocate memory (Worst Fit)
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    let worstFitIndex = -1;
+                    let maxWastage = -1;
+                    for (let i = 0; i < dynamicColumnCount; i++) {
+                        if (!blockStatus[i] && parseInt(p.mr) <= hole_arr[i]) {
+                            const wastage = hole_arr[i] - parseInt(p.mr);
+                            if (wastage > maxWastage) {
+                                maxWastage = wastage;
+                                worstFitIndex = i;
+                            }
+                        }
+                    }
+                    if (worstFitIndex !== -1) {
+                        p.allocated = true;
+                        p.waiting = false;
+                        p.memoryBlock = worstFitIndex;
+                        blockStatus[worstFitIndex] = true;
+                    } else {
+                        p.waiting = true;
+                        p.allocated = false;
+                    }
+                }
+            }
+            
+            // Determine running process (NPP - non-preemptive: continue current running process or select highest priority)
+            let runningProcess = null;
+            
+            // First check if there's already a running process that hasn't finished
+            for (let p of p_arr) {
+                if (p.running && p.allocated && !p.finished) {
+                    runningProcess = p;
+                    break;
+                }
+            }
+            
+            // If no process is currently running, select highest priority (lowest number) among allocated processes
+            if (!runningProcess) {
+                let highestPriority = Infinity;
+                let earliestArrival = Infinity;
+                for (let p of p_arr) {
+                    if (p.allocated && !p.finished) {
+                        const priority = parseInt(p.priority);
+                        const arrival = parseInt(p.arrival_time);
+                        if (priority < highestPriority || (priority === highestPriority && arrival < earliestArrival)) {
+                            highestPriority = priority;
+                            earliestArrival = arrival;
+                            runningProcess = p;
                         }
                     }
                 }
-                if (worstFitIndex !== -1) {
-                    pState.allocated = true;
-                    pState.memoryBlock = worstFitIndex;
-                    blockStatus[worstFitIndex] = true;
+            }
+            
+            // Update process states
+            for (let p of p_arr) {
+                if (p === runningProcess) {
+                    p.running = true;
+                    if (p.start_time === -1) {
+                        p.start_time = currentSimTime;
+                    }
+                } else {
+                    p.running = false;
                 }
             }
             
-            runningProcess = null;
-            let highestPriority = Infinity;
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0 && parseInt(p.priority) < highestPriority) {
-                    highestPriority = parseInt(p.priority);
-                    runningProcess = p.process_name;
-                }
-            }
-            
-            for (let p of processQueue) {
-                const pState = allocatedProcesses[p.process_name];
-                if (pState.allocated && pState.remainingBurst > 0) {
-                    const i = pState.memoryBlock;
-                    const cell = newRow.cells[i + 1];
+            // Display allocated processes in their assigned memory blocks
+            for (let p of p_arr) {
+                if (p.allocated && !p.finished && p.memoryBlock !== undefined) {
+                    const cell = newRow.cells[p.memoryBlock + 1];
                     cell.textContent = p.process_name + '(' + p.mr + ')';
                     totalAllocated += parseInt(p.mr);
-                    totalIF += hole_arr[i] - parseInt(p.mr);
-                    blockStatus[i] = true;
-                    if (runningProcess === p.process_name) {
+                    totalIF += hole_arr[p.memoryBlock] - parseInt(p.mr);
+                    
+                    if (p.running) {
                         cell.style.backgroundColor = '#2d5f2d';
                     } else {
                         cell.style.backgroundColor = '#4a4a2d';
                     }
                 }
             }
-            const waitingJobs = getWaitingJobs();
-            let totalEF = 0;
-            for (let i = 0; i < dynamicColumnCount; i++) {
-                if (!blockStatus[i] && waitingJobs.length > 0) {
-                    const canFit = waitingJobs.some(jobName => {
-                        const job = processQueue.find(p => p.process_name === jobName);
-                        return parseInt(job.mr) <= hole_arr[i];
-                    });
-                    if (!canFit) {
-                        totalEF += hole_arr[i];
-                        newRow.cells[i + 1].textContent = 'XX';
-                        newRow.cells[i + 1].style.color = 'red';
+            
+            // Execute running process (decrement burst time)
+            if (runningProcess) {
+                const pState = allocatedProcesses[runningProcess.process_name];
+                if (pState && pState.remainingBurst > 0) {
+                    pState.remainingBurst--;
+                    if (pState.remainingBurst === 0) {
+                        runningProcess.finished = true;
+                        runningProcess.running = false;
+                        runningProcess.allocated = false; // Free up the partition
+                        runningProcess.end_time = currentSimTime + 1;
                     }
                 }
             }
-            const allocatedMem = totalMemory - totalIF - totalEF;
-            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
-            newRow.insertCell(dynamicColumnCount + 1).textContent = totalIF;
-            newRow.insertCell(dynamicColumnCount + 2).textContent = totalEF;
-            newRow.insertCell(dynamicColumnCount + 3).textContent = mu + '%';
-            newRow.insertCell(dynamicColumnCount + 4).textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
             
-            if (runningProcess) {
-                const pState = allocatedProcesses[runningProcess];
-                if (pState.remainingBurst > 0) {
-                    pState.remainingBurst--;
+            // Calculate waiting jobs
+            const waitingJobs = [];
+            for (let p of p_arr) {
+                if (parseInt(p.arrival_time) <= currentSimTime && !p.allocated && !p.finished) {
+                    waitingJobs.push(p.process_name);
                 }
             }
+            
+            // Calculate external fragmentation
+            let totalEF = 0;
+            for (let i = 0; i < dynamicColumnCount; i++) {
+                if (!blockStatus[i]) {
+                    if (waitingJobs.length > 0) {
+                        const canFit = waitingJobs.some(jobName => {
+                            const job = p_arr.find(p => p.process_name === jobName);
+                            return parseInt(job.mr) <= hole_arr[i];
+                        });
+                        if (!canFit) {
+                            totalEF += hole_arr[i];
+                            const cell = newRow.cells[i + 1];
+                            cell.textContent = 'XX';
+                            cell.style.color = 'red';
+                        }
+                    }
+                }
+            }
+            
+            const allocatedMem = totalMemory - totalIF - totalEF;
+            const mu = totalMemory > 0 ? ((allocatedMem / totalMemory) * 100).toFixed(2) : 0;
+            
+            const ifCell = newRow.insertCell(dynamicColumnCount + 1);
+            ifCell.textContent = totalIF;
+            
+            const efCell = newRow.insertCell(dynamicColumnCount + 2);
+            efCell.textContent = totalEF;
+            
+            const muCell = newRow.insertCell(dynamicColumnCount + 3);
+            muCell.textContent = mu + '%';
+            
+            const waitingCell = newRow.insertCell(dynamicColumnCount + 4);
+            waitingCell.textContent = waitingJobs.length > 0 ? waitingJobs.join(', ') : '-';
+            
             updateLiveTable();
-            if (checkAllProcessesDone()) {
+            
+            // Check if all processes that can fit are done
+            let allDone = true;
+            for (let p of p_arr) {
+                const maxPartition = Math.max(...hole_arr);
+                if (parseInt(p.mr) <= maxPartition) { // Process can fit
+                    if (!p.finished) {
+                        allDone = false;
+                        break;
+                    }
+                }
+            }
+            
+            if (allDone) {
                 showProcessSummary();
             }
+            
             currentSimTime++;
-            document.querySelector('.table-container').scrollTop = document.querySelector('.table-container').scrollHeight;
+            
+            const tableContainer = document.querySelector('.table-container');
+            tableContainer.scrollTop = tableContainer.scrollHeight;
         }
 
+
+function toggleSidePanel() {
+    document.getElementById('sidePanel').classList.toggle('active');
+}
+        

@@ -1,0 +1,24 @@
+
+
+
+
+
+generate sample data - modal with options saying how many data, range of arrival times , range of burst times, range of mrs, range of priority if NPP
+
+animation in partition
+repeat simulation option button in simulation phase
+
+order of process in results
+
+
+introduction page
+
+
+
+
+
+
+limitations
+
+only non-preemptive algorithms
+only single processor(one process is served)

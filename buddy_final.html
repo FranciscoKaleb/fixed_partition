@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Buddy System + CPU Scheduling</title>
+  <link rel="stylesheet" href="b_style.css" />
+</head>
+<body>
+  <header>
+        <div class="burger-menu" onclick="toggleSidePanel()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <h1>Buddy System Simulator</h1>
+    </header>
+
+    <div id="sidePanel" class="side-panel">
+        <span class="close-panel" onclick="toggleSidePanel()">&times;</span>
+        <a href="about.html">About</a>
+        <a href="fixed_partition.html">Fixed Partition Simulator</a>
+        <a href="variable_partition.html">Variable Partition Simulator</a>
+        <a href="buddy_final.html">Buddy System</a>
+    </div>
+
+<button class="theme-toggle" onclick="toggleTheme()">🌙 Dark</button>
+
+<div class="container">
+  <h1>BUDDY SYSTEM</h1>
+  <p class="subtitle">MIT 501 - Operating System</p>
+
+  <div class="config">
+    <div class="config-row">
+      <label>Memory Space:</label>
+      <input type="number" id="userSpace" value="16" min="2" step="2" style="width: 90px;">
+
+      <label>Buddy Blocks:</label>
+      <input type="text" id="buddyBlocks" value="8,16,8" style="width: 180px;">
+
+      <label>CPU Algo:</label>
+      <select id="cpuAlgo" onchange="togglePriorityColumn()">
+        <option value="fcfs">FCFS</option>
+        <option value="sjf">SJF</option>
+        <option value="npp">NPP</option>
+        <option value="rr">Round Robin</option>
+      </select>
+      
+      <label id="quantumLabel" style="display: none;">Time Quantum:</label>
+      <input type="number" id="timeQuantum" min="1" step="1" value="2" style="width: 60px; display: none;">
+    </div>
+
+    <div class="btn-row">
+      <button type="button" onclick="addProcess()">Add Process</button>
+      <button type="button" onclick="simulate()">Run Simulation</button>
+      <button type="button" onclick="clearTable()">Clear</button>
+    </div>
+  </div>
+
+  <table class="jobs-table">
+    <thead>
+      <tr>
+        <th>Jobs</th>
+        <th>Arrival Time</th>
+        <th>Burst Time</th>
+        <th>MR</th>
+        <th id="priorityHeader" style="display: none;">Priority</th>
+      </tr>
+    </thead>
+    <tbody id="jobsBody"></tbody>
+  </table>
+
+  <div class="info-panel">
+    <div id="systemInfo"></div>
+  </div>
+
+  <div class="gantt-container">
+    <h3>Gantt Chart</h3>
+    <div id="ganttChart"></div>
+  </div>
+
+  <table class="result-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Memory</th>
+        <th>IE</th>
+        <th>EF</th>
+        <th>Out</th>
+        <th>%MU</th>
+      </tr>
+    </thead>
+    <tbody id="resultBody"></tbody>
+  </table>
+</div>
+
+<script src="b_script.js"></script>
+</body>
+</html>

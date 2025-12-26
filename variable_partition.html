@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Table Columns</title>
+    <link rel="stylesheet" type="text/css" href="var_style.css">
+    <script src="var_script.js" defer></script>
+</head>
+<body>
+    <header>
+        <div class="burger-menu" onclick="toggleSidePanel()">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+        <h1>Single Processor Fixed Partition Simulator</h1>
+    </header>
+
+    <div id="sidePanel" class="side-panel">
+        <span class="close-panel" onclick="toggleSidePanel()">&times;</span>
+        <a href="about.html">About</a>
+        <a href="fixed_partition.html">Fixed Partition Simulator</a>
+        <a href="variable_partition.html">Variable Partition Simulator</a>
+        <a href="buddy_final.html">Buddy System</a>
+    </div>
+
+    <div class="flex-container">
+
+
+        
+        <div class="right">
+            <div class="steps-container">
+                <div class="process-options">
+                    <p class = "step-label">STEP 1: choose Algorithm and an allocation strategy</p>
+                    <div class="controls">
+                        <div>
+                            <p>CPU Algo</p>
+                            <select id="algorithm_options" onchange="alterColumn()">
+                                <option value="FCFS">FCFS</option>
+                                <option value="SJF">SJF</option>
+                                <option value="NPP">NPP</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="steps-container">
+                <div class="process-inputs">
+                    <p class = "step-label">STEP 2: add process or generate</p>
+                    <div class="controls" id="processControls">
+                        <div>
+                            <input type="text" id="process_name" placeholder="Enter process name">
+                            <input type="number" id="arrival_time" placeholder="Enter arrival time">
+                            <input type="number" id="burst_time" placeholder="Enter burst time">
+                            <input type="number" id="mr" placeholder="Enter mr">
+                            <input type="number" id="priority" placeholder="Enter priority" class="hidden">
+                        </div>
+                        <div class="button-row">
+                            <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
+                            <button id="generateSample1Btn" onclick="generateSample1()">Generate Sample 1</button>
+                            <button id="generateSample2Btn" onclick="generateSample2()">Generate Sample 2</button>
+                            <button id="generateSampleBtn" onclick="showGenerateModal()">Generate Custom</button>
+                            <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="labels-container hidden" id="labelsContainer">
+                <div class="algorithm-label" id="algorithmLabel"></div>
+                <div class="allocation-label" id="allocationLabel"></div>
+            </div>
+
+            <div class="process-tables-container">
+                <div class="process-table">
+                    <div class="table-wrapper">
+                        <div>
+                            <table id="dataTable2">
+                                <thead>
+                                    <tr id="headerRow2">
+                                        <th>Process</th>
+                                        <th>Arrival Time</th>
+                                        <th>Burst Time</th>
+                                        <th>MR</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody2">
+                                    <tr>
+                                        <td>-</td>
+                                        <td>-</td>
+                                        <td>-</td>
+                                        <td>-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="edit-controls" id="editControls">
+                            <button id="editBtn" onclick="enableEdit()" class="hidden">Edit</button>
+                            <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
+                            <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="process-table hidden" id="liveTableContainer">
+                    <div class="table-wrapper">
+                        <div>
+                            <table id="dataTable3">
+                                <thead>
+                                    <tr id="headerRow3">
+                                        <th>Process</th>
+                                        <th>Remaining Burst</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tableBody3">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="memory-options">
+                <p class = "step-label">STEP 3: Add memory partition</p>
+                <div class="memory-content">
+                    <div class="memory-input">
+                        <div class="controls">
+                            <input type="number" id="columnInput" placeholder="Enter partition size">
+                        </div>
+                        <div class="button-row">
+                            <button id="addBtn" onclick="addColumn()">Add Partition</button>
+                            <button id="clearBtn" onclick="clearAllColumns()">Clear All Partitions</button>
+                        </div>
+                    </div>
+                    <div class="memory-table">
+                        <table id="partitionTable">
+                            <thead>
+                                <tr>
+                                    <th>Partition Size</th>
+                                </tr>
+                            </thead>
+                            <tbody id="partitionTableBody">
+                                <tr>
+                                    <td>-</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="finalize-section">
+                <button id="finalizeBtn" onclick="finalizeData()">Finalize Data</button>
+            </div>
+
+            <div class="action-buttons">
+                <button id="proceedBtn" disabled onclick = "startStep()" class="hidden">>>></button>
+                
+                <button id="finishBtn" disabled onclick="proceedToFinish()" class="hidden">proceed to finish</button>
+                <button id="repeatBtn" disabled onclick="repeatSimulation()" class="hidden">Repeat Simulation</button>
+                <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
+            </div>
+
+            <div class="time-display hidden" id="timeDisplay">
+                <label id="currentTimeLabel">Current Time: 0</label>
+            </div>
+            
+            <div class="arrival-timeline hidden" id="arrivalTimeline">
+                <h4>Process Arrival Timeline:</h4>
+                <br><br>
+                <div class="gantt-chart" id="arrivalChart"></div>
+                <div class="gantt-tick-marks" id="arrivalTickMarks"></div>
+                <div class="gantt-number-labels" id="arrivalNumberLabels"></div>
+            </div>
+
+            <div class="order-timeline hidden" id="orderTimeline">
+                <h4>Order of Process:</h4>
+                <div class="gantt-chart" id="orderChart"></div>
+                <div class="gantt-tick-marks" id="orderTickMarks"></div>
+                <div class="gantt-number-labels" id="orderNumberLabels"></div>
+            </div>
+
+            <div class="process-summary hidden" id="processSummary">
+                <div class="gantt-chart-container" id="ganttChartContainer">
+                    <h4>Order of process</h4>
+                    <div class="gantt-chart" id="ganttChart"></div>
+                    <div class="gantt-tick-marks" id="ganttTickMarks"></div>
+                    <div class="gantt-number-labels" id="ganttNumberLabels"></div>
+                </div>
+            </div>
+
+            <div class="process-summary hidden" id="processSummary2">
+                <p id="endTimeDisplay"></p>
+                <p><strong>Finished Process:</strong> <span id="finishedProcesses"></span></p>
+                <p><strong>Unfinished Process / Can't Fit Partition:</strong> <span id="unfinishedProcesses"></span></p>
+            </div>
+
+            <div class="reset-section">
+                <button id="editVariablesBtn" onclick="editVariables()" class="hidden">Edit Variables</button>
+                <button id="resetBtn" onclick="showResetModal()" class="hidden">Run Another Simulation</button>
+            </div>
+        </div>
+
+        <div class="left">
+            <div class="table-container">
+                <table id="dataTable">
+                    <thead>
+                        <tr id="headerRow">
+                            <th>Time</th>
+                            <th>IF</th>
+                            <th>EF</th>
+                            <th>MU</th>
+                            <th>Waiting Jobs</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr id="dataRow">
+
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <p id="modalMessage"></p>
+        </div>
+    </div>
+
+    <div id="resetModal" class="modal hidden">
+        <div class="modal-content">
+            <p>This will clear all your data. Are you sure you want to proceed?</p>
+            <p style="font-size: 12px; margin-top: 10px;">Tip: Click "Edit Variables" to keep your data.</p>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button onclick="confirmReset()">Yes, Clear Data</button>
+                <button onclick="closeResetModal()" style="background-color: #607d8b;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="generateModal" class="modal hidden">
+        <div class="modal-content" style="min-width: 400px;">
+            <span class="close" onclick="closeGenerateModal()">&times;</span>
+            <h3 style="margin-bottom: 20px;">Generate Sample Data</h3>
+            <div style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
+                <div>
+                    <label>Number of Processes:</label>
+                    <input type="number" id="genCount" value="5" min="1" max="20" style="width: 100%; margin-top: 5px;">
+                </div>
+                <div>
+                    <label>Arrival Time Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genArrivalMin" value="0" min="0" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genArrivalMax" value="10" min="0" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div>
+                    <label>Burst Time Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genBurstMin" value="2" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genBurstMax" value="10" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div>
+                    <label>Memory Requirement Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genMrMin" value="30" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genMrMax" value="120" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+                <div id="genPriorityDiv" class="hidden">
+                    <label>Priority Range:</label>
+                    <div style="display: flex; gap: 10px; margin-top: 5px;">
+                        <input type="number" id="genPriorityMin" value="1" min="1" placeholder="Min" style="flex: 1;">
+                        <input type="number" id="genPriorityMax" value="3" min="1" placeholder="Max" style="flex: 1;">
+                    </div>
+                </div>
+            </div>
+            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button onclick="confirmGenerate()">Generate</button>
+                <button onclick="closeGenerateModal()" style="background-color: #607d8b;">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2025 Fixed partition Simulator | MIT 501 Project 
+    </footer>
+
+</body>
+</html>
