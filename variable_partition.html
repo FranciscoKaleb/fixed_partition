@@ -3,9 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Table Columns</title>
-    <link rel="stylesheet" type="text/css" href="var_style.css">
-    <script src="var_script.js" defer></script>
+    <title>Variable Partition Simulator</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 20px; min-height: 100vh; color: #e0e0e0; }
+        header { background-color: #2d2d2d; color: white; padding: 20px; text-align: center; margin-bottom: 20px; border-radius: 8px; height: 50px; display: flex; align-items: center; justify-content: center; position: relative; }
+        .burger-menu { position: absolute; left: 20px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
+        .burger-menu span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
+        .side-panel { position: fixed; left: -250px; top: 0; width: 250px; height: 100%; background-color: #2d2d2d; transition: left 0.3s; z-index: 1001; padding-top: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); }
+        .side-panel.active { left: 0; }
+        .side-panel a { display: block; color: #e0e0e0; padding: 15px 20px; text-decoration: none; border-bottom: 1px solid #444; }
+        .side-panel a:hover { background-color: #3d3d3d; }
+        .close-panel { position: absolute; top: 15px; right: 20px; font-size: 30px; color: #e0e0e0; cursor: pointer; }
+        .close-panel:hover { color: #f44336; }
+        .container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .timeline-section { grid-column: 1 / -1; background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: 20px; }
+        .panel { background: linear-gradient(135deg, #2d2d2d 0%, #3d3d3d 100%); padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .step-label { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: #1976d2; }
+        .controls { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+        input, select { padding: 10px; border: 2px solid #555; border-radius: 4px; background-color: #3d3d3d; color: #e0e0e0; flex: 1; min-width: 100px; }
+        button { padding: 10px 15px; background-color: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        button:hover { background-color: #1565c0; }
+        button:disabled { background-color: #ccc; cursor: not-allowed; opacity: 0.6; }
+        .clear-btn { background-color: #f44336; }
+        .clear-btn:hover { background-color: #da190b; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: #2d2d2d; }
+        th, td { border: 1px solid #444; padding: 12px; text-align: center; color: #e0e0e0; }
+        th { background-color: #1e3a5f; color: white; }
+        .table-container { max-height: 500px; overflow-y: auto; }
+        .table-container::-webkit-scrollbar { width: 6px; }
+        .table-container::-webkit-scrollbar-track { background: #1a1a1a; }
+        .table-container::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        .hidden { display: none; }
+        .memory-block { background-color: #4CAF50; color: white; font-weight: bold; }
+        .memory-block-waiting { background-color: #d32f2f; color: white; font-weight: bold; }
+        .free-block { background-color: #666; color: #ccc; }
+        .action-buttons { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+        .labels-container { text-align: center; margin: 20px 0; }
+        .algorithm-label { font-size: 20px; font-weight: bold; color: #1976d2; }
+        .time-display { text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; }
+        .gantt-chart-container { margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #3d3d3d 0%, #4a4a4a 100%); border-radius: 8px; }
+        .gantt-chart-container h4 { color: #e0e0e0; margin-bottom: 10px; font-size: 16px; }
+        .gantt-chart { display: flex; width: 100%; height: 40px; border: 2px solid #555; border-radius: 4px; overflow: hidden; background-color: #1a1a1a; }
+        .gantt-process { display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 12px; border-right: 1px solid #333; position: relative; }
+        .gantt-process:last-child { border-right: none; }
+        .gantt-tick-marks { display: flex; width: 100%; position: relative; margin-top: 5px; }
+        .gantt-tick { border-left: 2px solid #555; height: 15px; }
+        .gantt-tick:last-child { border-right: 2px solid #555; border-left: none; }
+        .gantt-number-labels { display: flex; width: 100%; position: relative; margin-top: 5px; }
+        .gantt-number-label { font-weight: bold; font-size: 12px; color: #e0e0e0; position: relative; }
+        .gantt-number-label:not(:first-child) { margin-left: -10px; }
+        .arrival-timeline { margin: 15px 0; padding: 15px; background: linear-gradient(135deg, #3d3d3d 0%, #4a4a4a 100%); border-radius: 8px; }
+        .arrival-timeline h4 { color: #e0e0e0; margin-bottom: 10px; font-size: 16px; }
+        .arrival-timeline .gantt-chart { position: relative; height: 2px; overflow: visible; background-color: #555; }
+        .arrival-timeline .gantt-process { background-color: transparent !important; border: none; height: 2px; position: relative; bottom: 10px; overflow: visible; }
+        .arrival-timeline .gantt-tick { border-left: 2px solid #555; height: 15px; position: relative; }
+        .arrival-timeline .gantt-tick::before { content: attr(data-process); position: absolute; top: -40px; left: 0; font-size: 12px; font-weight: bold; color: #e0e0e0; }
+        .arrival-timeline .gantt-tick::after { content: ''; position: absolute; left: 0; top: -20px; width: 1px; height: 20px; background-color: #e0e0e0; }
+        .process-summary { margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #3d3d3d 0%, #4a4a4a 100%); border-radius: 8px; }
+        .process-summary p { margin: 5px 0; font-size: 16px; font-weight: bold; color: #e0e0e0; }
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
+    </style>
 </head>
 <body>
     <header>
@@ -14,9 +72,8 @@
             <span></span>
             <span></span>
         </div>
-        <h1>Single Processor Fixed Partition Simulator</h1>
+        <h1>Variable Partition Memory Simulator</h1>
     </header>
-
     <div id="sidePanel" class="side-panel">
         <span class="close-panel" onclick="toggleSidePanel()">&times;</span>
         <a href="about.html">About</a>
@@ -24,272 +81,599 @@
         <a href="variable_partition.html">Variable Partition Simulator</a>
         <a href="buddy_final.html">Buddy System</a>
     </div>
-
-    <div class="flex-container">
-
-
-        
-        <div class="right">
-            <div class="steps-container">
-                <div class="process-options">
-                    <p class = "step-label">STEP 1: choose Algorithm and an allocation strategy</p>
-                    <div class="controls">
-                        <div>
-                            <p>CPU Algo</p>
-                            <select id="algorithm_options" onchange="alterColumn()">
-                                <option value="FCFS">FCFS</option>
-                                <option value="SJF">SJF</option>
-                                <option value="NPP">NPP</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+    <div class="container">
+        <div class="panel">
+            <div class="step-label">STEP 1: Choose Algorithm</div>
+            <div class="controls">
+                <select id="algorithm" onchange="togglePriorityInput()">
+                    <option value="FCFS">First Come First Serve (FCFS)</option>
+                    <option value="SJF">Shortest Job First (SJF)</option>
+                    <option value="NPP">Non-Preemptive Priority (NPP)</option>
+                </select>
             </div>
-
-            <div class="steps-container">
-                <div class="process-inputs">
-                    <p class = "step-label">STEP 2: add process or generate</p>
-                    <div class="controls" id="processControls">
-                        <div>
-                            <input type="text" id="process_name" placeholder="Enter process name">
-                            <input type="number" id="arrival_time" placeholder="Enter arrival time">
-                            <input type="number" id="burst_time" placeholder="Enter burst time">
-                            <input type="number" id="mr" placeholder="Enter mr">
-                            <input type="number" id="priority" placeholder="Enter priority" class="hidden">
-                        </div>
-                        <div class="button-row">
-                            <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
-                            <button id="generateSample1Btn" onclick="generateSample1()">Generate Sample 1</button>
-                            <button id="generateSample2Btn" onclick="generateSample2()">Generate Sample 2</button>
-                            <button id="generateSampleBtn" onclick="showGenerateModal()">Generate Custom</button>
-                            <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
-                        </div>
-                    </div>
-                </div>
+            <div class="step-label">STEP 2: Set Total Memory Size</div>
+            <div class="controls">
+                <input type="number" id="totalMemory" placeholder="Total Memory (KB)" value="22">
+                <button onclick="setMemory()">Set Memory</button>
             </div>
-
-            <div class="labels-container hidden" id="labelsContainer">
-                <div class="algorithm-label" id="algorithmLabel"></div>
-                <div class="allocation-label" id="allocationLabel"></div>
+            <div class="step-label">STEP 3: Add Processes</div>
+            <div class="controls">
+                <input type="text" id="processName" placeholder="Name">
+                <input type="number" id="arrivalTime" placeholder="Arrival">
+                <input type="number" id="burstTime" placeholder="Burst">
+                <input type="number" id="memoryReq" placeholder="Memory">
+                <input type="number" id="priority" placeholder="Priority" class="hidden">
             </div>
-
-            <div class="process-tables-container">
-                <div class="process-table">
-                    <div class="table-wrapper">
-                        <div>
-                            <table id="dataTable2">
-                                <thead>
-                                    <tr id="headerRow2">
-                                        <th>Process</th>
-                                        <th>Arrival Time</th>
-                                        <th>Burst Time</th>
-                                        <th>MR</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tableBody2">
-                                    <tr>
-                                        <td>-</td>
-                                        <td>-</td>
-                                        <td>-</td>
-                                        <td>-</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="edit-controls" id="editControls">
-                            <button id="editBtn" onclick="enableEdit()" class="hidden">Edit</button>
-                            <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
-                            <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="process-table hidden" id="liveTableContainer">
-                    <div class="table-wrapper">
-                        <div>
-                            <table id="dataTable3">
-                                <thead>
-                                    <tr id="headerRow3">
-                                        <th>Process</th>
-                                        <th>Remaining Burst</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tableBody3">
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
+            <div class="controls">
+                <button onclick="addProcess()">Add Process</button>
+                <button onclick="generateSample()" style="background-color: #4CAF50;">Sample Data</button>
+                <button onclick="clearProcesses()" class="clear-btn">Clear All</button>
             </div>
-
-            <div class="memory-options">
-                <p class = "step-label">STEP 3: Add memory partition</p>
-                <div class="memory-content">
-                    <div class="memory-input">
-                        <div class="controls">
-                            <input type="number" id="columnInput" placeholder="Enter partition size">
-                        </div>
-                        <div class="button-row">
-                            <button id="addBtn" onclick="addColumn()">Add Partition</button>
-                            <button id="clearBtn" onclick="clearAllColumns()">Clear All Partitions</button>
-                        </div>
-                    </div>
-                    <div class="memory-table">
-                        <table id="partitionTable">
-                            <thead>
-                                <tr>
-                                    <th>Partition Size</th>
-                                </tr>
-                            </thead>
-                            <tbody id="partitionTableBody">
-                                <tr>
-                                    <td>-</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="finalize-section">
-                <button id="finalizeBtn" onclick="finalizeData()">Finalize Data</button>
-            </div>
-
-            <div class="action-buttons">
-                <button id="proceedBtn" disabled onclick = "startStep()" class="hidden">>>></button>
-                
-                <button id="finishBtn" disabled onclick="proceedToFinish()" class="hidden">proceed to finish</button>
-                <button id="repeatBtn" disabled onclick="repeatSimulation()" class="hidden">Repeat Simulation</button>
-                <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
-            </div>
-
-            <div class="time-display hidden" id="timeDisplay">
-                <label id="currentTimeLabel">Current Time: 0</label>
-            </div>
-            
-            <div class="arrival-timeline hidden" id="arrivalTimeline">
-                <h4>Process Arrival Timeline:</h4>
-                <br><br>
-                <div class="gantt-chart" id="arrivalChart"></div>
-                <div class="gantt-tick-marks" id="arrivalTickMarks"></div>
-                <div class="gantt-number-labels" id="arrivalNumberLabels"></div>
-            </div>
-
-            <div class="order-timeline hidden" id="orderTimeline">
-                <h4>Order of Process:</h4>
-                <div class="gantt-chart" id="orderChart"></div>
-                <div class="gantt-tick-marks" id="orderTickMarks"></div>
-                <div class="gantt-number-labels" id="orderNumberLabels"></div>
-            </div>
-
-            <div class="process-summary hidden" id="processSummary">
-                <div class="gantt-chart-container" id="ganttChartContainer">
-                    <h4>Order of process</h4>
-                    <div class="gantt-chart" id="ganttChart"></div>
-                    <div class="gantt-tick-marks" id="ganttTickMarks"></div>
-                    <div class="gantt-number-labels" id="ganttNumberLabels"></div>
-                </div>
-            </div>
-
-            <div class="process-summary hidden" id="processSummary2">
-                <p id="endTimeDisplay"></p>
-                <p><strong>Finished Process:</strong> <span id="finishedProcesses"></span></p>
-                <p><strong>Unfinished Process / Can't Fit Partition:</strong> <span id="unfinishedProcesses"></span></p>
-            </div>
-
-            <div class="reset-section">
-                <button id="editVariablesBtn" onclick="editVariables()" class="hidden">Edit Variables</button>
-                <button id="resetBtn" onclick="showResetModal()" class="hidden">Run Another Simulation</button>
-            </div>
-        </div>
-
-        <div class="left">
             <div class="table-container">
-                <table id="dataTable">
+                <table>
                     <thead>
-                        <tr id="headerRow">
-                            <th>Time</th>
-                            <th>IF</th>
-                            <th>EF</th>
-                            <th>MU</th>
-                            <th>Waiting Jobs</th>
+                        <tr id="processTableHeader">
+                            <th>Process</th>
+                            <th>Arrival</th>
+                            <th>Burst</th>
+                            <th>Memory</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr id="dataRow">
-
+                    <tbody id="processTable">
+                        <tr><td colspan="4">No processes added</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="controls" style="margin-top: 20px;">
+                <button onclick="startSimulation()" style="width: 100%; padding: 15px; font-size: 16px;"> Start Simulation </button>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="labels-container hidden" id="labelsContainer">
+                <div class="algorithm-label" id="algorithmLabel"></div>
+            </div>
+            <div class="time-display hidden" id="timeDisplay">
+                Current Time: <span id="currentTime">0</span>
+            </div>
+            <div class="action-buttons hidden" id="actionButtons">
+                <button onclick="stepSimulation()">Next Step</button>
+                <button onclick="finishSimulation()">Finish</button>
+                <button onclick="resetSimulation()">Reset</button>
+            </div>
+            <div class="table-container">
+                <table id="memoryTable">
+                    <thead>
+                        <tr id="memoryTableHeader">
+                            <th>Time</th>
+                            <th>EF</th>
+                            <th>%MU</th>
+                            <th>Out</th>
                         </tr>
+                    </thead>
+                    <tbody id="memoryTableBody">
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
-
-    <div id="modal" class="modal hidden">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <p id="modalMessage"></p>
+    <div class="timeline-section">
+        <div class="arrival-timeline hidden" id="arrivalTimeline">
+            <h4>Process Arrival Timeline:</h4>
+            <br><br>
+            <div class="gantt-chart" id="arrivalChart"></div>
+            <div class="gantt-tick-marks" id="arrivalTickMarks"></div>
+            <div class="gantt-number-labels" id="arrivalNumberLabels"></div>
+        </div>
+        <div class="process-summary hidden" id="processSummary">
+            <div class="gantt-chart-container" id="ganttChartContainer">
+                <h4>Gantt Chart - Process Execution Order:</h4>
+                <div class="gantt-chart" id="ganttChart"></div>
+                <div class="gantt-tick-marks" id="ganttTickMarks"></div>
+                <div class="gantt-number-labels" id="ganttNumberLabels"></div>
+            </div>
+            <p><strong>Finished Processes:</strong> <span id="finishedProcesses" style="color: #4CAF50;"></span></p>
+            <p><strong>Unfinished Processes:</strong> <span id="unfinishedProcesses" style="color: #f44336;"></span></p>
         </div>
     </div>
+    <script>
+        let processes = [];
+        let totalMemory = 22;
+        let currentTime = 0;
+        let memoryBlocks = [];
+        let algorithm = 'FCFS';
+        let simulationRunning = false;
+        let isPriorityVisible = false;
+        let currentlyRunningProcess = null;
 
-    <div id="resetModal" class="modal hidden">
-        <div class="modal-content">
-            <p>This will clear all your data. Are you sure you want to proceed?</p>
-            <p style="font-size: 12px; margin-top: 10px;">Tip: Click "Edit Variables" to keep your data.</p>
-            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-                <button onclick="confirmReset()">Yes, Clear Data</button>
-                <button onclick="closeResetModal()" style="background-color: #607d8b;">Cancel</button>
-            </div>
-        </div>
-    </div>
+        function togglePriorityInput() {
+            const algo = document.getElementById('algorithm').value;
+            const priorityInput = document.getElementById('priority');
+            const tableHeader = document.getElementById('processTableHeader');
+            if (algo === 'NPP') {
+                priorityInput.classList.remove('hidden');
+                isPriorityVisible = true;
+                if (!document.getElementById('priorityHeader')) {
+                    const th = document.createElement('th');
+                    th.textContent = 'Priority';
+                    th.id = 'priorityHeader';
+                    tableHeader.appendChild(th);
+                }
+            } else {
+                priorityInput.classList.add('hidden');
+                isPriorityVisible = false;
+                const priorityHeader = document.getElementById('priorityHeader');
+                if (priorityHeader) {
+                    priorityHeader.remove();
+                }
+            }
+            updateProcessTable();
+        }
 
-    <div id="generateModal" class="modal hidden">
-        <div class="modal-content" style="min-width: 400px;">
-            <span class="close" onclick="closeGenerateModal()">&times;</span>
-            <h3 style="margin-bottom: 20px;">Generate Sample Data</h3>
-            <div style="display: flex; flex-direction: column; gap: 15px; text-align: left;">
-                <div>
-                    <label>Number of Processes:</label>
-                    <input type="number" id="genCount" value="5" min="1" max="20" style="width: 100%; margin-top: 5px;">
-                </div>
-                <div>
-                    <label>Arrival Time Range:</label>
-                    <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <input type="number" id="genArrivalMin" value="0" min="0" placeholder="Min" style="flex: 1;">
-                        <input type="number" id="genArrivalMax" value="10" min="0" placeholder="Max" style="flex: 1;">
-                    </div>
-                </div>
-                <div>
-                    <label>Burst Time Range:</label>
-                    <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <input type="number" id="genBurstMin" value="2" min="1" placeholder="Min" style="flex: 1;">
-                        <input type="number" id="genBurstMax" value="10" min="1" placeholder="Max" style="flex: 1;">
-                    </div>
-                </div>
-                <div>
-                    <label>Memory Requirement Range:</label>
-                    <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <input type="number" id="genMrMin" value="30" min="1" placeholder="Min" style="flex: 1;">
-                        <input type="number" id="genMrMax" value="120" min="1" placeholder="Max" style="flex: 1;">
-                    </div>
-                </div>
-                <div id="genPriorityDiv" class="hidden">
-                    <label>Priority Range:</label>
-                    <div style="display: flex; gap: 10px; margin-top: 5px;">
-                        <input type="number" id="genPriorityMin" value="1" min="1" placeholder="Min" style="flex: 1;">
-                        <input type="number" id="genPriorityMax" value="3" min="1" placeholder="Max" style="flex: 1;">
-                    </div>
-                </div>
-            </div>
-            <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
-                <button onclick="confirmGenerate()">Generate</button>
-                <button onclick="closeGenerateModal()" style="background-color: #607d8b;">Cancel</button>
-            </div>
-        </div>
-    </div>
+        function setMemory() {
+            const input = document.getElementById('totalMemory');
+            totalMemory = parseInt(input.value) || 22;
+            alert(`Total memory set to ${totalMemory}KB`);
+        }
 
-    <footer>
-        &copy; 2025 Fixed partition Simulator | MIT 501 Project 
-    </footer>
+        function addProcess() {
+            const name = document.getElementById('processName').value.trim();
+            const arrival = parseInt(document.getElementById('arrivalTime').value);
+            const burst = parseInt(document.getElementById('burstTime').value);
+            const memory = parseInt(document.getElementById('memoryReq').value);
+            const priority = isPriorityVisible ? parseInt(document.getElementById('priority').value) : null;
+            if (!name || isNaN(arrival) || isNaN(burst) || isNaN(memory)) {
+                alert('Please fill all process fields');
+                return;
+            }
+            if (isPriorityVisible && isNaN(priority)) {
+                alert('Please enter priority value');
+                return;
+            }
+            processes.push({
+                name: name,
+                arrival: arrival,
+                burst: burst,
+                memory: memory,
+                priority: priority,
+                remainingBurst: burst,
+                allocated: false,
+                waiting: false,
+                finished: false,
+                running: false,
+                startTime: -1,
+                endTime: -1,
+                startAddress: -1
+            });
+            updateProcessTable();
+            clearInputs();
+        }
 
+        function clearInputs() {
+            document.getElementById('processName').value = '';
+            document.getElementById('arrivalTime').value = '';
+            document.getElementById('burstTime').value = '';
+            document.getElementById('memoryReq').value = '';
+            if (isPriorityVisible) {
+                document.getElementById('priority').value = '';
+            }
+        }
+
+        function generateSample() {
+            const algo = document.getElementById('algorithm').value;
+            if (algo === 'NPP') {
+                processes = [
+                    {name: 'A7', arrival: 0, burst: 4, memory: 7, priority: 2, remainingBurst: 4, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'B3', arrival: 1, burst: 3, memory: 3, priority: 1, remainingBurst: 3, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'C6', arrival: 2, burst: 2, memory: 6, priority: 3, remainingBurst: 2, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'D6', arrival: 3, burst: 3, memory: 6, priority: 2, remainingBurst: 3, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1}
+                ];
+            } else {
+                processes = [
+                    {name: 'A7', arrival: 0, burst: 4, memory: 7, priority: null, remainingBurst: 4, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'B3', arrival: 1, burst: 3, memory: 3, priority: null, remainingBurst: 3, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'C6', arrival: 2, burst: 2, memory: 6, priority: null, remainingBurst: 2, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1},
+                    {name: 'D6', arrival: 3, burst: 3, memory: 6, priority: null, remainingBurst: 3, allocated: false, waiting: false, finished: false, running: false, startTime: -1, endTime: -1, startAddress: -1}
+                ];
+            }
+            updateProcessTable();
+        }
+
+        function clearProcesses() {
+            processes = [];
+            updateProcessTable();
+        }
+
+        function updateProcessTable() {
+            const tbody = document.getElementById('processTable');
+            if (processes.length === 0) {
+                const colspan = isPriorityVisible ? 5 : 4;
+                tbody.innerHTML = `<tr><td colspan="${colspan}">No processes added</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = processes.map(p => `
+                <tr>
+                    <td>${p.name}</td>
+                    <td>${p.arrival}</td>
+                    <td>${p.burst}</td>
+                    <td>${p.memory}</td>
+                    ${isPriorityVisible ? `<td>${p.priority !== null ? p.priority : '-'}</td>` : ''}
+                </tr>
+            `).join('');
+        }
+
+        function startSimulation() {
+            if (processes.length === 0) {
+                alert('Please add processes first');
+                return;
+            }
+            algorithm = document.getElementById('algorithm').value;
+            currentTime = 0;
+            simulationRunning = true;
+            currentlyRunningProcess = null;
+            memoryBlocks = [{ start: 0, size: totalMemory, process: null, free: true }];
+            processes.forEach(p => {
+                p.remainingBurst = p.burst;
+                p.allocated = false;
+                p.waiting = false;
+                p.finished = false;
+                p.running = false;
+                p.startTime = -1;
+                p.endTime = -1;
+                p.startAddress = -1;
+            });
+            processes.sort((a, b) => a.arrival - b.arrival);
+            document.getElementById('labelsContainer').classList.remove('hidden');
+            document.getElementById('timeDisplay').classList.remove('hidden');
+            document.getElementById('actionButtons').classList.remove('hidden');
+            const algoNames = {
+                'FCFS': 'First Come First Serve',
+                'SJF': 'Shortest Job First',
+                'NPP': 'Non-Preemptive Priority'
+            };
+            document.getElementById('algorithmLabel').textContent = algoNames[algorithm];
+            updateMemoryTableHeader();
+            createArrivalTimeline();
+        }
+
+        function updateMemoryTableHeader() {
+            const header = document.getElementById('memoryTableHeader');
+            const memoryHeader = `<th colspan="${totalMemory}">Memory (${totalMemory}k)</th>`;
+            header.innerHTML = `
+                <th>Time</th>
+                ${memoryHeader}
+                <th>EF</th>
+                <th>%MU</th>
+                <th>Waiting</th>
+                <th>Out</th>
+            `;
+        }
+
+        function stepSimulation() {
+            if (!simulationRunning) return;
+
+            processes.forEach(p => {
+                if (p.arrival === currentTime && !p.allocated && !p.finished) {
+                    const allocated = allocateMemory(p);
+                    if (!allocated) {
+                        p.waiting = true;
+                    }
+                }
+            });
+
+            processes.forEach(p => {
+                if (p.waiting && !p.allocated && !p.finished) {
+                    const allocated = allocateMemory(p);
+                    if (allocated) {
+                        p.waiting = false;
+                    }
+                }
+            });
+
+            let runningProcess = null;
+            if (currentlyRunningProcess && !currentlyRunningProcess.finished && currentlyRunningProcess.remainingBurst > 0) {
+                runningProcess = currentlyRunningProcess;
+            } else {
+                if (algorithm === 'FCFS') {
+                    runningProcess = processes.find(p => p.allocated && p.remainingBurst > 0);
+                } else if (algorithm === 'SJF') {
+                    const allocated = processes.filter(p => p.allocated && p.remainingBurst > 0);
+                    if (allocated.length > 0) {
+                        runningProcess = allocated.reduce((min, p) => p.remainingBurst < min.remainingBurst ? p : min );
+                    }
+                } else if (algorithm === 'NPP') {
+                    const allocated = processes.filter(p => p.allocated && p.remainingBurst > 0);
+                    if (allocated.length > 0) {
+                        runningProcess = allocated.reduce((highest, p) => {
+                            if (p.priority < highest.priority) return p;
+                            if (p.priority === highest.priority && p.arrival < highest.arrival) return p;
+                            return highest;
+                        });
+                    }
+                }
+                currentlyRunningProcess = runningProcess;
+            }
+
+            processes.forEach(p => {
+                p.running = (p === runningProcess);
+            });
+
+            if (runningProcess && runningProcess.startTime === -1) {
+                runningProcess.startTime = currentTime;
+            }
+
+            updateMemoryTable();
+
+            if (runningProcess) {
+                runningProcess.remainingBurst--;
+                if (runningProcess.remainingBurst === 0) {
+                    runningProcess.endTime = currentTime + 1;
+                    runningProcess.finished = true;
+                    deallocateMemory(runningProcess);
+                    currentlyRunningProcess = null;
+                }
+            }
+
+            currentTime++;
+            document.getElementById('currentTime').textContent = currentTime;
+
+            const unfinished = processes.filter(p => !p.finished);
+            if (unfinished.length === 0) {
+                showProcessSummary();
+                simulationRunning = false;
+            } else {
+                const arrivedUnfinished = unfinished.filter(p => p.arrival <= currentTime);
+                if (arrivedUnfinished.length > 0 && arrivedUnfinished.every(p => p.waiting) && !runningProcess) {
+                    showProcessSummary();
+                    simulationRunning = false;
+                }
+            }
+        }
+
+        function createArrivalTimeline() {
+            const arrivalContainer = document.getElementById('arrivalChart');
+            const arrivalTickMarks = document.getElementById('arrivalTickMarks');
+            const arrivalNumberLabels = document.getElementById('arrivalNumberLabels');
+            arrivalContainer.innerHTML = '';
+            arrivalTickMarks.innerHTML = '';
+            arrivalNumberLabels.innerHTML = '';
+            const processGroups = {};
+            processes.forEach(process => {
+                const arrivalTime = parseInt(process.arrival);
+                if (!processGroups[arrivalTime]) {
+                    processGroups[arrivalTime] = [];
+                }
+                processGroups[arrivalTime].push(process.name);
+            });
+            const sortedTimes = Object.keys(processGroups).map(t => parseInt(t)).sort((a, b) => a - b);
+            const maxArrivalTime = Math.max(...sortedTimes);
+            let currentTime = 0;
+            sortedTimes.forEach((arrivalTime, index) => {
+                if (arrivalTime > currentTime) {
+                    const gapDiv = document.createElement('div');
+                    gapDiv.className = 'gantt-process';
+                    gapDiv.style.width = ((arrivalTime - currentTime) / (maxArrivalTime + 1)) * 100 + '%';
+                    gapDiv.style.backgroundColor = '#333';
+                    gapDiv.style.fontSize = '10px';
+                    arrivalContainer.appendChild(gapDiv);
+                    const gapTick = document.createElement('div');
+                    gapTick.className = 'gantt-tick';
+                    gapTick.style.flex = (arrivalTime - currentTime);
+                    arrivalTickMarks.appendChild(gapTick);
+                    const gapLabel = document.createElement('div');
+                    gapLabel.className = 'gantt-number-label';
+                    gapLabel.style.flex = (arrivalTime - currentTime);
+                    arrivalNumberLabels.appendChild(gapLabel);
+                }
+                const processDiv = document.createElement('div');
+                processDiv.className = 'gantt-process';
+                processDiv.style.width = (1 / (maxArrivalTime + 1)) * 100 + '%';
+                arrivalContainer.appendChild(processDiv);
+                const processTick = document.createElement('div');
+                processTick.className = 'gantt-tick';
+                processTick.style.flex = 1;
+                processTick.setAttribute('data-process', processGroups[arrivalTime].join(', '));
+                arrivalTickMarks.appendChild(processTick);
+                const processLabel = document.createElement('div');
+                processLabel.className = 'gantt-number-label';
+                processLabel.style.flex = 1;
+                processLabel.textContent = arrivalTime;
+                arrivalNumberLabels.appendChild(processLabel);
+                currentTime = arrivalTime + 1;
+            });
+            const finalTick = document.createElement('div');
+            finalTick.className = 'gantt-tick';
+            arrivalTickMarks.appendChild(finalTick);
+            document.getElementById('arrivalTimeline').classList.remove('hidden');
+        }
+
+        function createGanttChart() {
+            const finishedProcesses = processes.filter(p => p.finished && p.startTime >= 0).sort((a, b) => a.startTime - b.startTime);
+            if (finishedProcesses.length === 0) return;
+            const ganttContainer = document.getElementById('ganttChart');
+            const tickMarksContainer = document.getElementById('ganttTickMarks');
+            const numberLabelsContainer = document.getElementById('ganttNumberLabels');
+            ganttContainer.innerHTML = '';
+            tickMarksContainer.innerHTML = '';
+            numberLabelsContainer.innerHTML = '';
+            const totalTime = Math.max(...finishedProcesses.map(p => p.endTime));
+            const colors = ['#4CAF50', '#2196F3', '#FF9800', '#9C27B0', '#F44336', '#00BCD4', '#FFEB3B', '#795548'];
+            let currentTime = 0;
+            finishedProcesses.forEach((process, index) => {
+                if (process.startTime > currentTime) {
+                    const gapDiv = document.createElement('div');
+                    gapDiv.className = 'gantt-process';
+                    gapDiv.style.width = ((process.startTime - currentTime) / totalTime) * 100 + '%';
+                    gapDiv.style.backgroundColor = '#333';
+                    gapDiv.textContent = 'IDLE';
+                    gapDiv.style.fontSize = '10px';
+                    ganttContainer.appendChild(gapDiv);
+                    const gapTick = document.createElement('div');
+                    gapTick.className = 'gantt-tick';
+                    gapTick.style.flex = (process.startTime - currentTime);
+                    tickMarksContainer.appendChild(gapTick);
+                    const gapLabel = document.createElement('div');
+                    gapLabel.className = 'gantt-number-label';
+                    gapLabel.style.flex = (process.startTime - currentTime);
+                    numberLabelsContainer.appendChild(gapLabel);
+                }
+                const duration = process.endTime - process.startTime;
+                const widthPercent = (duration / totalTime) * 100;
+                const processDiv = document.createElement('div');
+                processDiv.className = 'gantt-process';
+                processDiv.style.width = widthPercent + '%';
+                processDiv.style.backgroundColor = colors[index % colors.length];
+                processDiv.textContent = process.name;
+                ganttContainer.appendChild(processDiv);
+                const processTick = document.createElement('div');
+                processTick.className = 'gantt-tick';
+                processTick.style.flex = duration;
+                tickMarksContainer.appendChild(processTick);
+                const processLabel = document.createElement('div');
+                processLabel.className = 'gantt-number-label';
+                processLabel.style.flex = duration;
+                processLabel.textContent = process.startTime;
+                numberLabelsContainer.appendChild(processLabel);
+                currentTime = process.endTime;
+            });
+            const finalTick = document.createElement('div');
+            finalTick.className = 'gantt-tick';
+            tickMarksContainer.appendChild(finalTick);
+            const finalLabel = document.createElement('div');
+            finalLabel.className = 'gantt-number-label';
+            finalLabel.textContent = totalTime;
+            numberLabelsContainer.appendChild(finalLabel);
+        }
+
+        function showProcessSummary() {
+            const finished = [];
+            const unfinished = [];
+            processes.forEach(p => {
+                if (p.finished) {
+                    finished.push(p.name);
+                } else {
+                    unfinished.push(p.name);
+                }
+            });
+            createGanttChart();
+            const finishedEl = document.getElementById('finishedProcesses');
+            finishedEl.textContent = finished.length > 0 ? finished.join(', ') : 'None';
+            const unfinishedEl = document.getElementById('unfinishedProcesses');
+            unfinishedEl.textContent = unfinished.length > 0 ? unfinished.join(', ') : 'None';
+            document.getElementById('processSummary').classList.remove('hidden');
+            document.getElementById('actionButtons').classList.add('hidden');
+            alert('Simulation complete!');
+        }
+
+        function finishSimulation() {
+            while (simulationRunning) {
+                stepSimulation();
+            }
+        }
+
+        function allocateMemory(process) {
+            for (let i = 0; i < memoryBlocks.length; i++) {
+                const block = memoryBlocks[i];
+                if (block.free && block.size >= process.memory) {
+                    process.allocated = true;
+                    process.startAddress = block.start;
+                    if (block.size > process.memory) {
+                        memoryBlocks.splice(i + 1, 0, { start: block.start + process.memory, size: block.size - process.memory, process: null, free: true });
+                    }
+                    block.size = process.memory;
+                    block.process = process.name;
+                    block.free = false;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function deallocateMemory(process) {
+            const blockIndex = memoryBlocks.findIndex(b => b.process === process.name);
+            if (blockIndex !== -1) {
+                memoryBlocks[blockIndex].free = true;
+                memoryBlocks[blockIndex].process = null;
+                mergeAdjacentFreeBlocks();
+            }
+            process.allocated = false;
+        }
+
+        function mergeAdjacentFreeBlocks() {
+            for (let i = 0; i < memoryBlocks.length - 1; i++) {
+                if (memoryBlocks[i].free && memoryBlocks[i + 1].free) {
+                    memoryBlocks[i].size += memoryBlocks[i + 1].size;
+                    memoryBlocks.splice(i + 1, 1);
+                    i--;
+                }
+            }
+        }
+
+        function updateMemoryTable() {
+            const tbody = document.getElementById('memoryTableBody');
+            const allocatedMemory = memoryBlocks.filter(b => !b.free).reduce((sum, b) => sum + b.size, 0);
+            const waitingProcesses = processes.filter(p => p.waiting && !p.finished);
+            const waitingProcessNames = waitingProcesses.map(p => p.name).join(', ');
+            let externalFragmentation = 0;
+            if (waitingProcesses.length > 0) {
+                memoryBlocks.forEach(block => {
+                    if (block.free) {
+                        const canFitAnyWaiting = waitingProcesses.some(p => p.memory <= block.size);
+                        if (!canFitAnyWaiting) {
+                            externalFragmentation += block.size;
+                        }
+                    }
+                });
+            }
+            const memoryUtilization = ((allocatedMemory / totalMemory) * 100).toFixed(0);
+            const finishedNow = processes.filter(p => p.endTime === currentTime).map(p => p.name).join(', ');
+            const memoryViz = memoryBlocks.map(block => {
+                if (block.free) {
+                    return `<td class="free-block" colspan="${block.size}">${block.size}</td>`;
+                } else {
+                    const process = processes.find(p => p.name === block.process);
+                    const isRunning = process && process.running;
+                    const blockClass = isRunning ? 'memory-block' : 'memory-block-waiting';
+                    const processMemory = process.memory;
+                    const blockSize = block.size;
+                    if (processMemory < blockSize) {
+                        const processColspan = processMemory;
+                        const fragmentColspan = blockSize - processMemory;
+                        return `<td class="${blockClass}" colspan="${processColspan}">${block.process}</td><td class="free-block" colspan="${fragmentColspan}" style="background-color: #444;">${fragmentColspan}</td>`;
+                    } else {
+                        return `<td class="${blockClass}" colspan="${blockSize}">${block.process}</td>`;
+                    }
+                }
+            }).join('');
+            const row = `
+                <tr>
+                    <td>${currentTime}</td>
+                    ${memoryViz}
+                    <td>${externalFragmentation}</td>
+                    <td>${memoryUtilization}%</td>
+                    <td>${waitingProcessNames || '-'}</td>
+                    <td>${finishedNow || '-'}</td>
+                </tr>
+            `;
+            tbody.innerHTML += row;
+        }
+
+        function resetSimulation() {
+            currentTime = 0;
+            simulationRunning = false;
+            memoryBlocks = [];
+            currentlyRunningProcess = null;
+            document.getElementById('memoryTableBody').innerHTML = '';
+            document.getElementById('labelsContainer').classList.add('hidden');
+            document.getElementById('timeDisplay').classList.add('hidden');
+            document.getElementById('actionButtons').classList.add('hidden');
+            document.getElementById('arrivalTimeline').classList.add('hidden');
+            document.getElementById('processSummary').classList.add('hidden');
+            document.getElementById('currentTime').textContent = '0';
+        }
+
+        function toggleSidePanel() {
+            document.getElementById('sidePanel').classList.toggle('active');
+        }
+    </script>
 </body>
 </html>
