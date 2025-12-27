@@ -7,7 +7,7 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 0px; min-height: 100vh; color: #e0e0e0; }
-        header { background-color: #2d2d2d; color: white; padding: 20px; text-align: center; margin-bottom: 20px; border-radius: 8px; height: 50px; display: flex; align-items: center; justify-content: center; position: relative; }
+        header { background-color: #2d2d2d; color: white; padding: 20px; text-align: center; margin-bottom: 20px; border-radius: 8px; height: 50px; display: flex; align-items: center; justify-content: center; position: relative; opacity: 0.6; }
         .burger-menu { position: absolute; left: 20px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
         .burger-menu span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
         .side-panel { position: fixed; left: -250px; top: 0; width: 250px; height: 100%; background-color: #2d2d2d; transition: left 0.3s; z-index: 1001; padding-top: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.5); }
@@ -38,7 +38,8 @@
         .memory-block { background-color: #4CAF50; color: white; font-weight: bold; }
         .memory-block-waiting { background-color: #d32f2f; color: white; font-weight: bold; }
         .free-block { background-color: #666; color: #ccc; }
-        .action-buttons { display: flex; gap: 10px; justify-content: center; margin: 20px 0; }
+        .action-buttons { display: flex; gap: 10px; justify-content: center; margin: 20px 0; transition: all 0.3s ease; }
+        .action-buttons.glow-blue { box-shadow: 0 0 25px rgba(25, 118, 210, 0.9), 0 0 40px rgba(25, 118, 210, 0.5); border-radius: 8px; padding: 15px; }
         .labels-container { text-align: center; margin: 20px 0; }
         .algorithm-label { font-size: 20px; font-weight: bold; color: #1976d2; }
         .time-display { text-align: center; font-size: 24px; font-weight: bold; margin: 20px 0; }
@@ -79,6 +80,17 @@
             box-shadow: 0 0 20px rgba(25, 118, 210, 0.8), 0 4px 6px rgba(0, 0, 0, 0.3);
             border-color: #1976d2;
         }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.7); }
+        .modal.show { display: flex; justify-content: center; align-items: center; }
+        .modal-content { background-color: #2d2d2d; padding: 30px; border-radius: 8px; text-align: center; color: #e0e0e0; border: 2px solid #1976d2; max-width: 400px; box-shadow: 0 0 20px rgba(25, 118, 210, 0.5); }
+        .modal-content h2 { color: #1976d2; margin-bottom: 15px; }
+        .modal-content button { background-color: #1976d2; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; }
+        .modal-content button:hover { background-color: #1565c0; }
+        .edit-controls { display: flex; gap: 10px; justify-content: center; margin-top: 15px; }
+        .edit-controls button { padding: 10px 20px; font-size: 14px; }
+        .delete-btn { background-color: #f44336; padding: 5px 10px; font-size: 12px; }
+        .delete-btn:hover { background-color: #da190b; }
+        table input { width: 100%; padding: 8px; background-color: #1a1a1a; border: 1px solid #1976d2; color: #e0e0e0; }
         @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -141,12 +153,18 @@
                                 <th>Arrival</th>
                                 <th>Burst</th>
                                 <th>Memory</th>
+                                <th id="actionsHeader" class="hidden">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="processTable">
                             <tr><td colspan="4">No processes added</td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="edit-controls hidden" id="editControls">
+                    <button id="editBtn" onclick="enableEdit()">Edit</button>
+                    <button id="saveBtn" onclick="saveEdit()" class="hidden">Save</button>
+                    <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden">Cancel</button>
                 </div>
             </div>
 
@@ -163,7 +181,7 @@
                 Current Time: <span id="currentTime">0</span>
             </div>
            
-            <div class="table-container" style = "height:550px;">
+            <div class="table-container simulator-card" style = "height:550px;">
                 <table id="memoryTable">
                     <thead>
                         <tr id="memoryTableHeader">
@@ -182,6 +200,13 @@
                 <button onclick="finishSimulation()">Finish</button>
                 <button onclick="resetSimulation()">Reset</button>
             </div>
+        </div>
+    </div>
+    <div id="simulationModal" class="modal">
+        <div class="modal-content">
+            <h2>Simulation Complete</h2>
+            <p>Your simulation has finished successfully.</p>
+            <button onclick="closeSimulationModal()">Close</button>
         </div>
     </div>
     <div class="timeline-section">
@@ -313,20 +338,106 @@
 
         function updateProcessTable() {
             const tbody = document.getElementById('processTable');
+            const editControls = document.getElementById('editControls');
+            const actionsHeader = document.getElementById('actionsHeader');
+            
             if (processes.length === 0) {
                 const colspan = isPriorityVisible ? 5 : 4;
                 tbody.innerHTML = `<tr><td colspan="${colspan}">No processes added</td></tr>`;
+                editControls.classList.add('hidden');
+                actionsHeader.classList.add('hidden');
                 return;
             }
-            tbody.innerHTML = processes.map(p => `
-                <tr>
-                    <td>${p.name}</td>
-                    <td>${p.arrival}</td>
-                    <td>${p.burst}</td>
-                    <td>${p.memory}</td>
-                    ${isPriorityVisible ? `<td>${p.priority !== null ? p.priority : '-'}</td>` : ''}
+            
+            tbody.innerHTML = processes.map((p, index) => `
+                <tr data-index="${index}">
+                    <td class="name-cell">${p.name}</td>
+                    <td class="arrival-cell">${p.arrival}</td>
+                    <td class="burst-cell">${p.burst}</td>
+                    <td class="memory-cell">${p.memory}</td>
+                    ${isPriorityVisible ? `<td class="priority-cell">${p.priority !== null ? p.priority : '-'}</td>` : ''}
+                    <td class="actions-cell hidden"></td>
                 </tr>
             `).join('');
+            
+            // Show edit button if there are processes
+            editControls.classList.remove('hidden');
+            document.getElementById('editBtn').classList.remove('hidden');
+            document.getElementById('saveBtn').classList.add('hidden');
+            document.getElementById('cancelEditBtn').classList.add('hidden');
+            actionsHeader.classList.add('hidden');
+        }
+
+        function enableEdit() {
+            const tbody = document.getElementById('processTable');
+            const rows = tbody.querySelectorAll('tr');
+            const actionsHeader = document.getElementById('actionsHeader');
+            
+            rows.forEach((row, index) => {
+                const cells = row.querySelectorAll('td');
+                const process = processes[index];
+                
+                // Make each cell an input
+                const nameCellContent = cells[0].textContent;
+                cells[0].innerHTML = `<input type="text" value="${nameCellContent}" class="edit-name">`;
+                
+                const arrivalCellContent = cells[1].textContent;
+                cells[1].innerHTML = `<input type="number" value="${arrivalCellContent}" class="edit-arrival">`;
+                
+                const burstCellContent = cells[2].textContent;
+                cells[2].innerHTML = `<input type="number" value="${burstCellContent}" class="edit-burst">`;
+                
+                const memoryCellContent = cells[3].textContent;
+                cells[3].innerHTML = `<input type="number" value="${memoryCellContent}" class="edit-memory">`;
+                
+                if (isPriorityVisible && cells[4]) {
+                    const priorityCellContent = cells[4].textContent;
+                    cells[4].innerHTML = `<input type="number" value="${priorityCellContent === '-' ? '' : priorityCellContent}" class="edit-priority">`;
+                }
+                
+                // Add delete button to actions cell
+                const actionsCell = cells[isPriorityVisible ? 5 : 4];
+                actionsCell.innerHTML = `<button class="delete-btn" onclick="deleteProcess(${index})">Delete</button>`;
+                actionsCell.classList.remove('hidden');
+            });
+            
+            // Toggle buttons and show actions header
+            document.getElementById('editBtn').classList.add('hidden');
+            document.getElementById('saveBtn').classList.remove('hidden');
+            document.getElementById('cancelEditBtn').classList.remove('hidden');
+            actionsHeader.classList.remove('hidden');
+        }
+
+        function saveEdit() {
+            const tbody = document.getElementById('processTable');
+            const rows = tbody.querySelectorAll('tr');
+            
+            rows.forEach((row, index) => {
+                if (index >= processes.length) return;
+                
+                const inputs = row.querySelectorAll('input');
+                const process = processes[index];
+                
+                process.name = inputs[0].value.trim();
+                process.arrival = parseInt(inputs[1].value);
+                process.burst = parseInt(inputs[2].value);
+                process.memory = parseInt(inputs[3].value);
+                
+                if (isPriorityVisible && inputs[4]) {
+                    process.priority = inputs[4].value !== '' ? parseInt(inputs[4].value) : null;
+                }
+            });
+            
+            updateProcessTable();
+        }
+
+        function cancelEdit() {
+            updateProcessTable();
+        }
+
+        function deleteProcess(index) {
+            processes.splice(index, 1);
+            updateProcessTable();
         }
 
         function startSimulation() {
@@ -361,6 +472,12 @@
             document.getElementById('algorithmLabel').textContent = algoNames[algorithm];
             updateMemoryTableHeader();
             createArrivalTimeline();
+            
+            // Add glow to action buttons
+            const actionButtonsDiv = document.getElementById('actionButtons');
+            if (actionButtonsDiv) {
+                actionButtonsDiv.classList.add('glow-blue');
+            }
         }
 
         function updateMemoryTableHeader() {
@@ -589,7 +706,17 @@
             unfinishedEl.textContent = unfinished.length > 0 ? unfinished.join(', ') : 'None';
             document.getElementById('processSummary').classList.remove('hidden');
             document.getElementById('actionButtons').classList.add('hidden');
-            alert('Simulation complete!');
+            
+            // Remove glow and show modal
+            const actionButtonsDiv = document.getElementById('actionButtons');
+            if (actionButtonsDiv) {
+                actionButtonsDiv.classList.remove('glow-blue');
+            }
+            document.getElementById('simulationModal').classList.add('show');
+        }
+
+        function closeSimulationModal() {
+            document.getElementById('simulationModal').classList.remove('show');
         }
 
         function finishSimulation() {

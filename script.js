@@ -491,6 +491,12 @@
                 
                 // Hide input sections
                 hideInputSections();
+                
+                // Add glow to action buttons
+                const actionButtonsDiv = document.querySelector('.action-buttons');
+                if (actionButtonsDiv) {
+                    actionButtonsDiv.classList.add('glow-blue');
+                }
             } else {
                 modalMessage.textContent = 'Simulation Not Ready. Fill in necessary data.';
                 modal.classList.remove('hidden');
@@ -585,7 +591,10 @@
         }
 
         function repeatSimulation() {
-
+            const actionButtonsDiv = document.querySelector('.action-buttons');
+            if (actionButtonsDiv) {
+                actionButtonsDiv.classList.add('glow-blue');
+            }
             currentSimTime = 0;
             processQueue = [];
             allocatedProcesses = {};
@@ -863,8 +872,17 @@
             document.getElementById('proceedBtn').disabled = true;
             document.getElementById('finishBtn').disabled = true;
             document.getElementById('editVariablesBtn').classList.remove('hidden');
+
+            document.getElementById('arrivalTimeline').classList.remove('hidden');
+
             document.getElementById('resetBtn').classList.remove('hidden');
             document.getElementById('currentTimeLabel').classList.add('hidden');
+            
+            // Remove glow from action buttons when simulation ends
+            const actionButtonsDiv = document.querySelector('.action-buttons');
+            if (actionButtonsDiv) {
+                actionButtonsDiv.classList.remove('glow-blue');
+            }
         }
         function createArrivalTimeline() {
             const arrivalContainer = document.getElementById('arrivalChart');
