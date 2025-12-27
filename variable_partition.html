@@ -6,7 +6,7 @@
     <title>Variable Partition Simulator</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 20px; min-height: 100vh; color: #e0e0e0; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 0px; min-height: 100vh; color: #e0e0e0; }
         header { background-color: #2d2d2d; color: white; padding: 20px; text-align: center; margin-bottom: 20px; border-radius: 8px; height: 50px; display: flex; align-items: center; justify-content: center; position: relative; }
         .burger-menu { position: absolute; left: 20px; display: flex; flex-direction: column; gap: 4px; cursor: pointer; }
         .burger-menu span { width: 25px; height: 3px; background-color: white; border-radius: 2px; }
@@ -62,6 +62,19 @@
         .arrival-timeline .gantt-tick::after { content: ''; position: absolute; left: 0; top: -20px; width: 1px; height: 20px; background-color: #e0e0e0; }
         .process-summary { margin-top: 20px; padding: 15px; background: linear-gradient(135deg, #3d3d3d 0%, #4a4a4a 100%); border-radius: 8px; }
         .process-summary p { margin: 5px 0; font-size: 16px; font-weight: bold; color: #e0e0e0; }
+        .simulator-card {
+    
+            padding: 25px;
+            background: linear-gradient(135deg, #3d3d3d 0%, #4a4a4a 100%);
+            border: 2px solid #555;
+            border-radius: 8px;
+            text-decoration: none;
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            margin-bottom:20px;
+        }
         @media (max-width: 768px) { .container { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -76,54 +89,64 @@
     </header>
     <div id="sidePanel" class="side-panel">
         <span class="close-panel" onclick="toggleSidePanel()">&times;</span>
-        <a href="about.html">About</a>
+        <a href="index.html">About</a>
         <a href="fixed_partition.html">Fixed Partition Simulator</a>
         <a href="variable_partition.html">Variable Partition Simulator</a>
         <a href="buddy_final.html">Buddy System</a>
     </div>
     <div class="container">
         <div class="panel">
-            <div class="step-label">STEP 1: Choose Algorithm</div>
-            <div class="controls">
-                <select id="algorithm" onchange="togglePriorityInput()">
-                    <option value="FCFS">First Come First Serve (FCFS)</option>
-                    <option value="SJF">Shortest Job First (SJF)</option>
-                    <option value="NPP">Non-Preemptive Priority (NPP)</option>
-                </select>
+            <div class ="simulator-card">
+                <div class="step-label">STEP 1: Choose Algorithm</div>
+                <div class="controls">
+                    <select id="algorithm" onchange="togglePriorityInput()">
+                        <option value="FCFS">First Come First Serve (FCFS)</option>
+                        <option value="SJF">Shortest Job First (SJF)</option>
+                        <option value="NPP">Non-Preemptive Priority (NPP)</option>
+                    </select>
+                </div>
             </div>
-            <div class="step-label">STEP 2: Set Total Memory Size</div>
-            <div class="controls">
-                <input type="number" id="totalMemory" placeholder="Total Memory (KB)" value="22">
-                <button onclick="setMemory()">Set Memory</button>
+
+            <div class ="simulator-card">
+                <div class="step-label">STEP 2: Set Total Memory Size</div>
+                <div class="controls">
+                    <input type="number" id="totalMemory" placeholder="Total Memory (KB)" value="22">
+                    <button onclick="setMemory()">Set Memory</button>
+                </div>
+            </div>  
+            
+            <div class ="simulator-card">
+                <div class="step-label">STEP 3: Add Processes</div>
+                <div class="controls">
+                    <input type="text" id="processName" placeholder="Name">
+                    <input type="number" id="arrivalTime" placeholder="Arrival">
+                    <input type="number" id="burstTime" placeholder="Burst">
+                    <input type="number" id="memoryReq" placeholder="Memory">
+                    <input type="number" id="priority" placeholder="Priority" class="hidden">
+                </div>
+                <div class="controls">
+                    <button onclick="addProcess()">Add Process</button>
+                    <button onclick="generateSample()" style="background-color: #4CAF50;">Sample Data</button>
+                    <button onclick="clearProcesses()" class="clear-btn">Clear All</button>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr id="processTableHeader">
+                                <th>Process</th>
+                                <th>Arrival</th>
+                                <th>Burst</th>
+                                <th>Memory</th>
+                            </tr>
+                        </thead>
+                        <tbody id="processTable">
+                            <tr><td colspan="4">No processes added</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="step-label">STEP 3: Add Processes</div>
-            <div class="controls">
-                <input type="text" id="processName" placeholder="Name">
-                <input type="number" id="arrivalTime" placeholder="Arrival">
-                <input type="number" id="burstTime" placeholder="Burst">
-                <input type="number" id="memoryReq" placeholder="Memory">
-                <input type="number" id="priority" placeholder="Priority" class="hidden">
-            </div>
-            <div class="controls">
-                <button onclick="addProcess()">Add Process</button>
-                <button onclick="generateSample()" style="background-color: #4CAF50;">Sample Data</button>
-                <button onclick="clearProcesses()" class="clear-btn">Clear All</button>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr id="processTableHeader">
-                            <th>Process</th>
-                            <th>Arrival</th>
-                            <th>Burst</th>
-                            <th>Memory</th>
-                        </tr>
-                    </thead>
-                    <tbody id="processTable">
-                        <tr><td colspan="4">No processes added</td></tr>
-                    </tbody>
-                </table>
-            </div>
+
+            
             <div class="controls" style="margin-top: 20px;">
                 <button onclick="startSimulation()" style="width: 100%; padding: 15px; font-size: 16px;"> Start Simulation </button>
             </div>
@@ -135,12 +158,8 @@
             <div class="time-display hidden" id="timeDisplay">
                 Current Time: <span id="currentTime">0</span>
             </div>
-            <div class="action-buttons hidden" id="actionButtons">
-                <button onclick="stepSimulation()">Next Step</button>
-                <button onclick="finishSimulation()">Finish</button>
-                <button onclick="resetSimulation()">Reset</button>
-            </div>
-            <div class="table-container">
+           
+            <div class="table-container" style = "height:550px;">
                 <table id="memoryTable">
                     <thead>
                         <tr id="memoryTableHeader">
@@ -153,6 +172,11 @@
                     <tbody id="memoryTableBody">
                     </tbody>
                 </table>
+            </div>
+             <div class="action-buttons hidden" id="actionButtons">
+                <button onclick="stepSimulation()">Next Step</button>
+                <button onclick="finishSimulation()">Finish</button>
+                <button onclick="resetSimulation()">Reset</button>
             </div>
         </div>
     </div>

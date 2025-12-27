@@ -19,7 +19,7 @@
 
     <div id="sidePanel" class="side-panel">
         <span class="close-panel" onclick="toggleSidePanel()">&times;</span>
-        <a href="about.html">About</a>
+        <a href="index.html">About</a>
         <a href="fixed_partition.html">Fixed Partition Simulator</a>
         <a href="variable_partition.html">Variable Partition Simulator</a>
         <a href="buddy_final.html">Buddy System</a>
@@ -30,7 +30,7 @@
 
         
         <div class="right">
-            <div class="steps-container">
+            <div class="steps-container simulator-card">
                 <div class="process-options">
                     <p class = "step-label">STEP 1: choose Algorithm and an allocation strategy</p>
                     <div class="controls">
@@ -56,7 +56,7 @@
             </div>
 
             <div class="steps-container">
-                <div class="process-inputs">
+                <div class="process-inputs simulator-card" >
                     <p class = "step-label">STEP 2: add process or generate</p>
                     <div class="controls" id="processControls">
                         <div>
@@ -68,9 +68,9 @@
                         </div>
                         <div class="button-row">
                             <button id="addProcessBtn" onclick="createProcess()">Add Process</button>
-                            <button id="generateSample1Btn" onclick="generateSample1()">Generate Sample 1</button>
-                            <button id="generateSample2Btn" onclick="generateSample2()">Generate Sample 2</button>
-                            <button id="generateSampleBtn" onclick="showGenerateModal()">Generate Custom</button>
+                            <button id="generateSample1Btn" onclick="generateSample1()" style="background-color: #4CAF50;">Generate Sample 1</button>
+                            <button id="generateSample2Btn" onclick="generateSample2()" style="background-color: #4CAF50;">Generate Sample 2</button>
+                            <button id="generateSampleBtn" onclick="showGenerateModal()" style="background-color: #4CAF50;">Generate Custom</button>
                             <button id="clearTableBtn" onclick="clearProcessTable()">Clear Table</button>
                         </div>
                     </div>
@@ -83,8 +83,8 @@
             </div>
 
             <div class="process-tables-container">
-                <div class="process-table">
-                    <div class="table-wrapper">
+                <div class="process-table simulator-card">
+                    <div class="table-wrapper ">
                         <div>
                             <table id="dataTable2">
                                 <thead>
@@ -112,7 +112,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="process-table hidden" id="liveTableContainer">
+                <div class="process-table hidden simulator-card" id="liveTableContainer">
                     <div class="table-wrapper">
                         <div>
                             <table id="dataTable3">
@@ -130,7 +130,7 @@
                 </div>
             </div>
 
-            <div class="memory-options">
+            <div class="memory-options simulator-card">
                 <p class = "step-label">STEP 3: Add memory partition</p>
                 <div class="memory-content">
                     <div class="memory-input">
@@ -159,23 +159,16 @@
                 </div>
             </div>
 
-            <div class="finalize-section">
-                <button id="finalizeBtn" onclick="finalizeData()">Finalize Data</button>
+            <div class="simulator-card finalize-section">
+                <button id="finalizeBtn" onclick="finalizeData()"  style = "align-self: center; width: 80%" >Finalize Data</button>
             </div>
 
-            <div class="action-buttons">
-                <button id="proceedBtn" disabled onclick = "startStep()" class="hidden">>>></button>
-                
-                <button id="finishBtn" disabled onclick="proceedToFinish()" class="hidden">proceed to finish</button>
-                <button id="repeatBtn" disabled onclick="repeatSimulation()" class="hidden">Repeat Simulation</button>
-                <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
-            </div>
 
             <div class="time-display hidden" id="timeDisplay">
                 <label id="currentTimeLabel">Current Time: 0</label>
             </div>
             
-            <div class="arrival-timeline hidden" id="arrivalTimeline">
+            <div class="arrival-timeline hidden simulator-card" id="arrivalTimeline">
                 <h4>Process Arrival Timeline:</h4>
                 <br><br>
                 <div class="gantt-chart" id="arrivalChart"></div>
@@ -183,14 +176,14 @@
                 <div class="gantt-number-labels" id="arrivalNumberLabels"></div>
             </div>
 
-            <div class="order-timeline hidden" id="orderTimeline">
+            <div class="order-timeline hidden simulator-card" id="orderTimeline">
                 <h4>Order of Process:</h4>
                 <div class="gantt-chart" id="orderChart"></div>
                 <div class="gantt-tick-marks" id="orderTickMarks"></div>
                 <div class="gantt-number-labels" id="orderNumberLabels"></div>
             </div>
 
-            <div class="process-summary hidden" id="processSummary">
+            <div class="process-summary hidden simulator-card" id="processSummary">
                 <div class="gantt-chart-container" id="ganttChartContainer">
                     <h4>Order of process</h4>
                     <div class="gantt-chart" id="ganttChart"></div>
@@ -199,7 +192,7 @@
                 </div>
             </div>
 
-            <div class="process-summary hidden" id="processSummary2">
+            <div class="process-summary hidden simulator-card" id="processSummary2">
                 <p id="endTimeDisplay"></p>
                 <p><strong>Finished Process:</strong> <span id="finishedProcesses"></span></p>
                 <p><strong>Unfinished Process / Can't Fit Partition:</strong> <span id="unfinishedProcesses"></span></p>
@@ -212,7 +205,7 @@
         </div>
 
         <div class="left">
-            <div class="table-container">
+            <div class="table-container simulator-card">
                 <table id="dataTable">
                     <thead>
                         <tr id="headerRow">
@@ -229,6 +222,13 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div class="action-buttons">
+                <button id="proceedBtn" disabled onclick = "startStep()" class="hidden">>>></button>
+                
+                <button id="finishBtn" disabled onclick="proceedToFinish()" class="hidden">proceed to finish</button>
+                <button id="repeatBtn" disabled onclick="repeatSimulation()" class="hidden">Repeat Simulation</button>
+                <!-- <button id="cancelBtn" onclick="cancelSimulation()" disabled>Cancel Simulation</button> -->
             </div>
         </div>
     </div>
